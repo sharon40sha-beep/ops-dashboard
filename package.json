@@ -1,0 +1,19 @@
+{
+  "name": "ops-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "OPS Dashboard - ניהול צוות אבטחה/הפעלה עם Supabase backend וסנכרון בזמן אמת",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vite": "^5.4.8"
+  }
+}

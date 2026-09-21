@@ -1,0 +1,21 @@
+{
+  "name": "OPS Dashboard",
+  "short_name": "OPS",
+  "description": "ניהול צוות אבטחה/הפעלה",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#12151C",
+  "theme_color": "#12151C",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
