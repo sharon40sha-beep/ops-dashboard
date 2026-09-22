@@ -13,6 +13,14 @@ export interface Employee {
   role: Role
 }
 
+/** Full employee row as returned by the admin_list_employees() RPC (no PIN). */
+export interface AdminEmployee {
+  id: string
+  name: string
+  role: Role
+  is_active: boolean
+}
+
 export interface Site {
   id: string // 'S01'..'S06' warehouses, 'S07' factory, extendable
   kind: SiteKind

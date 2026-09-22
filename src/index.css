@@ -577,3 +577,75 @@ input.mono {
   padding: 24px;
   text-align: center;
 }
+
+/* ---------- Employees management ---------- */
+.emp-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.emp-row:last-child {
+  border-bottom: none;
+}
+.emp-row.inactive {
+  opacity: 0.55;
+}
+.emp-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.emp-row-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+.badge-off {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-inline-start: 8px;
+  background: rgba(224, 108, 90, 0.15);
+  color: var(--danger);
+}
+.role-select {
+  width: auto;
+  padding: 8px 10px;
+  font-size: 13px;
+  border-radius: 10px;
+}
+.emp-row-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.btn.sm {
+  width: auto;
+  flex: 1;
+  margin-top: 0;
+  padding: 9px 12px;
+  font-size: 13px;
+}
+
+/* ---------- Modal ---------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 60;
+}
+.modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  width: 100%;
+  max-width: 380px;
+}
+.modal h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
