@@ -1,21 +1,25 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
+const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined
 
-if (!url || !key) {
+if (!supabaseUrl || !supabaseKey) {
   throw new Error(
-    'חסרים משתני סביבה: ודא ש-VITE_SUPABASE_URL ו-VITE_SUPABASE_PUBLISHABLE_KEY מוגדרים בקובץ .env'
-  );
+    'Missing Supabase env vars. Create a .env file with VITE_SUPABASE_URL and ' +
+      'VITE_SUPABASE_PUBLISHABLE_KEY (see .env.example).',
+  )
 }
 
-export const supabase = createClient(url, key, {
+// Plain client using the publishable (anon) key. There is no Supabase Auth in
+// this app — identification is a PIN verified SERVER-SIDE via the verify_pin()
+// RPC (the employees table itself is not readable by the anon key), and the
+// "session" (who is logged in on this device) lives in localStorage only.
+export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
-    // אנחנו לא משתמשים ב-Supabase Auth — session מנוהל ב-localStorage מול טבלת employees.
     persistSession: false,
     autoRefreshToken: false,
   },
   realtime: {
-    params: { eventsPerSecond: 5 },
+    params: { eventsPerSecond: 10 },
   },
-});
+})
