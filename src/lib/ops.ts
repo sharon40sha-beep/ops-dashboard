@@ -64,3 +64,37 @@ export function fmtDateTime(iso: string): string {
     hour12: false,
   })
 }
+
+// ---------------------------------------------------------------------------
+// Password policy — MUST mirror _valid_password() in 0005_passwords.sql.
+// This is a client-side reminder only; the DB is the authority.
+// ---------------------------------------------------------------------------
+const SYMBOL_RE = new RegExp('[!@#$%^&*()_+=.,;:?/|~<>{}]')
+
+export const PASSWORD_RULE_HINT = 'לפחות 6 תווים, כולל אות, ספרה וסימן (!@#$%^&*…)'
+
+/** Returns a Hebrew error string, or null if the password satisfies the policy. */
+export function passwordError(pw: string): string | null {
+  if (pw.length < 6) return 'הסיסמה חייבת להכיל לפחות 6 תווים'
+  if (!/[A-Za-z]/.test(pw)) return 'הסיסמה חייבת להכיל לפחות אות אחת'
+  if (!/[0-9]/.test(pw)) return 'הסיסמה חייבת להכיל לפחות ספרה אחת'
+  if (!SYMBOL_RE.test(pw)) return 'הסיסמה חייבת להכיל לפחות סימן אחד (!@#$%^&*…)'
+  return null
+}
+
+/** Human-readable Hebrew reason for a login_attempts row. */
+export function loginReasonHe(reason: string | null, success: boolean): string {
+  if (success) return 'הצלחה'
+  switch (reason) {
+    case 'wrong_password':
+      return 'סיסמה שגויה'
+    case 'locked':
+      return 'חשבון נעול'
+    case 'unknown_employee':
+      return 'עובד לא מזוהה'
+    case 'inactive':
+      return 'חשבון מושבת'
+    default:
+      return reason || 'כישלון'
+  }
+}

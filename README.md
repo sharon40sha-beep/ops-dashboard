@@ -31,6 +31,7 @@ npm run dev               # http://localhost:5173
 2. `supabase/migrations/0002_seed.sql` — נתוני seed (6 מחסנים + מפעל, 6 מוצרים, 5 עובדים).
 3. `supabase/migrations/0003_grants.sql` — הרשאות Postgres ל-anon (מתקן `42501`).
 4. `supabase/migrations/0004_admin_employees.sql` — `is_active` + RPCs לניהול עובדים.
+5. `supabase/migrations/0005_passwords.sql` — סיסמאות עם hash (bcrypt), מדיניות סיסמה, נעילה אחרי כשלים, ולוג כניסות.
 
 כל הקבצים idempotent (אפשר להריץ שוב).
 
@@ -43,19 +44,24 @@ select * from public.list_login_employees();   -- 5 שורות, בלי עמוד�
 select * from public.employees;                -- אמור להיכשל/להחזיר 0 עם anon key (RLS נעול)
 ```
 
-## אבטחה — אימות PIN בצד שרת
+## אבטחה — אימות סיסמה בצד שרת
 
-⚠️ **חשוב:** טבלת `employees` (כולל ה-PINs) **אינה קריאה מה-client** עם ה-anon key —
-RLS מופעל בלי אף policy של `select`. ההתחברות עוברת דרך שתי פונקציות
-`SECURITY DEFINER`:
+⚠️ **חשוב:** טבלת `employees` (כולל ה-hash של הסיסמאות) **אינה קריאה מה-client** עם
+ה-anon key — RLS מופעל בלי אף policy של `select`. ההתחברות עוברת דרך פונקציות
+`SECURITY DEFINER` בלבד:
 
-- `list_login_employees()` — מחזירה `id/name/role` בלבד (לרשימת ההתחברות ובורר העובד). **לא** מחזירה PIN.
-- `verify_pin(emp_id, pin_input)` — משווה את ה-PIN **בתוך ה-DB** ומחזירה את העובד רק בהתאמה.
+- `list_login_employees()` — מחזירה `id/name/role` של עובדים **פעילים** בלבד.
+- `verify_pin(emp_id, pin_input)` — משווה `crypt(input, pin_hash)` **בתוך ה-DB** ומחזירה את העובד רק בהתאמה.
 
-כך שום PIN לא מגיע לדפדפן, וה-client לא יכול לשלוף את הטבלה. ה-session (מי מחובר
-במכשיר) נשמר ב-`localStorage` בלבד. אין Supabase Auth.
+**מנגנון הסיסמאות (0005):**
+- סיסמאות נשמרות כ-**bcrypt hash** (pgcrypto `crypt` + `gen_salt('bf')`), לא כטקסט גלוי.
+- **מדיניות** (נאכפת בצד שרת): לפחות 6 תווים, אות, ספרה וסימן. ולידציה גם בלקוח כתזכורת.
+- **נעילה מפני ניחוש:** 3 כשלים רצופים → החשבון נעול ל-30 דקות; בזמן נעילה `verify_pin` דוחה מיד בלי לבדוק סיסמה.
+- **לוג כניסות:** כל ניסיון נכתב ל-`login_attempts`; מסך "כניסות" (Admin) מציג את האחרונים דרך `admin_list_login_attempts`.
 
-> שנה את ה-PIN-ים של ה-seed (`1234`/`1111`/…) לפני שימוש אמיתי.
+שום סיסמה/hash לא מגיע לדפדפן. ה-session (מי מחובר במכשיר) נשמר ב-`localStorage` בלבד. אין Supabase Auth.
+
+> החלף את הסיסמאות הזמניות של ה-seed דרך מסך "עובדים" מיד אחרי ההתחברות הראשונה.
 
 ## מסכים
 

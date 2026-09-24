@@ -21,6 +21,16 @@ export interface AdminEmployee {
   is_active: boolean
 }
 
+/** One row from the login_attempts audit log (admin_list_login_attempts RPC). */
+export interface LoginAttempt {
+  id: string
+  employee_id: string | null
+  employee_name: string | null
+  attempted_at: string
+  success: boolean
+  reason: string | null
+}
+
 export interface Site {
   id: string // 'S01'..'S06' warehouses, 'S07' factory, extendable
   kind: SiteKind

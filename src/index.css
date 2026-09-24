@@ -649,3 +649,43 @@ input.mono {
   margin: 0 0 8px;
   font-size: 16px;
 }
+
+/* ---------- Password field ---------- */
+.pw-field {
+  position: relative;
+}
+.pw-field input {
+  padding-inline-start: 46px; /* room for the toggle (RTL: logical start) */
+}
+.pw-toggle {
+  position: absolute;
+  inset-inline-start: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+/* ---------- Login attempts ---------- */
+.card-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.card-head-row .btn.sm {
+  flex: 0 0 auto;
+}
+.badge.ok {
+  background: rgba(90, 185, 138, 0.15);
+  color: var(--ok);
+}
+.badge.fail {
+  background: rgba(224, 108, 90, 0.15);
+  color: var(--danger);
+}

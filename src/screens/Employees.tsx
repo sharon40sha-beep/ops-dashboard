@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../utils/supabase'
+import { PASSWORD_RULE_HINT, passwordError } from '../lib/ops'
 import type { AdminEmployee, Role } from '../types'
 import Toast from '../components/Toast'
 
@@ -14,8 +15,8 @@ interface Pending {
 }
 
 export default function Employees() {
-  // actor PIN of the logged-in admin — kept in memory only, never persisted.
-  const [gatePin, setGatePin] = useState('')
+  // actor password of the logged-in admin — kept in memory only, never persisted.
+  const [gatePw, setGatePw] = useState('')
   const [unlocked, setUnlocked] = useState(false)
   const [rows, setRows] = useState<AdminEmployee[]>([])
   const [loading, setLoading] = useState(false)
@@ -24,18 +25,18 @@ export default function Employees() {
 
   // add-employee form
   const [addName, setAddName] = useState('')
-  const [addPin, setAddPin] = useState('')
+  const [addPw, setAddPw] = useState('')
   const [addRole, setAddRole] = useState<Role>('operator')
 
   // confirm modal
   const [pending, setPending] = useState<Pending | null>(null)
-  const [confirmPin, setConfirmPin] = useState('')
-  const [newPin, setNewPin] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  const [newPw, setNewPw] = useState('')
   const [busy, setBusy] = useState(false)
   const [modalErr, setModalErr] = useState('')
 
-  async function loadRoster(actorPin: string): Promise<boolean> {
-    const { data, error } = await supabase.rpc('admin_list_employees', { actor_pin: actorPin })
+  async function loadRoster(actorPw: string): Promise<boolean> {
+    const { data, error } = await supabase.rpc('admin_list_employees', { actor_pin: actorPw })
     if (error) return false
     setRows((data as AdminEmployee[]) ?? [])
     return true
@@ -44,10 +45,10 @@ export default function Employees() {
   async function unlock() {
     setGateErr('')
     setLoading(true)
-    const ok = await loadRoster(gatePin)
+    const ok = await loadRoster(gatePw)
     setLoading(false)
     if (!ok) {
-      setGateErr('PIN שגוי או שאינו שייך למנהל פעיל')
+      setGateErr('סיסמה שגויה או שאינה שייכת למנהל פעיל')
       return
     }
     setUnlocked(true)
@@ -56,55 +57,57 @@ export default function Employees() {
   function openConfirm(p: Pending) {
     setPending(p)
     setModalErr('')
-    setNewPin('')
-    setConfirmPin(gatePin) // prefill with the admin PIN already entered (editable)
+    setNewPw('')
+    setConfirmPw(gatePw) // prefill with the admin password already entered (editable)
   }
 
   function closeConfirm() {
     setPending(null)
     setBusy(false)
     setModalErr('')
-    setNewPin('')
+    setNewPw('')
   }
 
   async function execute() {
     if (!pending) return
     setModalErr('')
 
-    // client-side sanity checks before hitting the RPC
+    // client-side sanity checks (server is authoritative)
     if (pending.kind === 'add') {
       if (addName.trim() === '') return setModalErr('שם עובד חובה')
-      if (!/^\d{4}$/.test(addPin)) return setModalErr('PIN חייב להיות 4 ספרות')
+      const pe = passwordError(addPw)
+      if (pe) return setModalErr(pe)
     }
-    if (pending.kind === 'setPin' && !/^\d{4}$/.test(newPin)) {
-      return setModalErr('PIN חדש חייב להיות 4 ספרות')
+    if (pending.kind === 'setPin') {
+      const pe = passwordError(newPw)
+      if (pe) return setModalErr(pe)
     }
-    if (!confirmPin) return setModalErr('נדרש PIN מנהל לאישור')
+    if (!confirmPw) return setModalErr('נדרשת סיסמת מנהל לאישור')
 
     setBusy(true)
     let error = null as { message: string } | null
     if (pending.kind === 'add') {
       ;({ error } = await supabase.rpc('admin_add_employee', {
-        actor_pin: confirmPin,
+        actor_pin: confirmPw,
         new_name: addName.trim(),
-        new_pin: addPin,
+        new_pin: addPw,
         new_role: addRole,
       }))
     } else if (pending.kind === 'setPin') {
       ;({ error } = await supabase.rpc('admin_set_pin', {
-        actor_pin: confirmPin,
+        actor_pin: confirmPw,
         target_id: pending.targetId,
-        new_pin: newPin,
+        new_pin: newPw,
       }))
     } else if (pending.kind === 'role') {
       ;({ error } = await supabase.rpc('admin_set_role', {
-        actor_pin: confirmPin,
+        actor_pin: confirmPw,
         target_id: pending.targetId,
         new_role: pending.newRole,
       }))
     } else if (pending.kind === 'active') {
       ;({ error } = await supabase.rpc('admin_set_active', {
-        actor_pin: confirmPin,
+        actor_pin: confirmPw,
         target_id: pending.targetId,
         new_active: pending.newActive,
       }))
@@ -116,21 +119,20 @@ export default function Employees() {
       return
     }
 
-    // success — reload roster (use the same admin PIN gate)
-    const ok = await loadRoster(gatePin)
+    const ok = await loadRoster(gatePw)
     setBusy(false)
     if (pending.kind === 'add') {
       setAddName('')
-      setAddPin('')
+      setAddPw('')
       setAddRole('operator')
     }
     setToast('בוצע')
     closeConfirm()
     if (!ok) {
-      // e.g. the admin changed their own PIN/role — force re-auth into the screen
+      // e.g. the admin changed their own password/role — force re-auth
       setUnlocked(false)
-      setGatePin('')
-      setGateErr('ההרשאה השתנתה — הזן שוב PIN מנהל')
+      setGatePw('')
+      setGateErr('ההרשאה השתנתה — הזן/י שוב סיסמת מנהל')
     }
   }
 
@@ -141,25 +143,27 @@ export default function Employees() {
       <div>
         <div className="card">
           <h2>ניהול עובדים — אימות מנהל</h2>
-          <p className="muted">מסך זה חשוף למנהלים בלבד. הזן/י את ה-PIN שלך כדי לטעון את הרשימה.</p>
-          <label>PIN מנהל</label>
+          <p className="muted">מסך זה חשוף למנהלים בלבד. הזן/י את סיסמתך כדי לטעון את הרשימה.</p>
+          <label>סיסמת מנהל</label>
           <input
             type="password"
-            inputMode="numeric"
-            maxLength={4}
-            className="mono"
-            value={gatePin}
-            onChange={(e) => setGatePin(e.target.value.replace(/\D/g, ''))}
-            placeholder="••••"
+            value={gatePw}
+            onChange={(e) => setGatePw(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void unlock()
+            }}
+            placeholder="סיסמה"
           />
           {gateErr && <div className="error-banner" style={{ marginTop: 12 }}>{gateErr}</div>}
-          <button className="btn" onClick={() => void unlock()} disabled={loading || gatePin.length !== 4}>
+          <button className="btn" onClick={() => void unlock()} disabled={loading || gatePw === ''}>
             {loading ? 'טוען…' : 'טען רשימה'}
           </button>
         </div>
       </div>
     )
   }
+
+  const addInvalid = addName.trim() === '' || passwordError(addPw) !== null
 
   return (
     <div>
@@ -170,16 +174,8 @@ export default function Employees() {
         <input type="text" value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="שם העובד" />
         <div style={{ display: 'flex', gap: 12 }}>
           <div style={{ flex: 1 }}>
-            <label>PIN (4 ספרות)</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={4}
-              className="mono"
-              value={addPin}
-              onChange={(e) => setAddPin(e.target.value.replace(/\D/g, ''))}
-              placeholder="1234"
-            />
+            <label>סיסמה</label>
+            <input type="text" value={addPw} onChange={(e) => setAddPw(e.target.value)} placeholder="סיסמה" />
           </div>
           <div style={{ flex: 1 }}>
             <label>הרשאה</label>
@@ -189,10 +185,11 @@ export default function Employees() {
             </select>
           </div>
         </div>
+        <p className="muted">{PASSWORD_RULE_HINT}</p>
         <button
           className="btn"
           onClick={() => openConfirm({ kind: 'add', label: `הוספת עובד: ${addName.trim() || '—'}` })}
-          disabled={addName.trim() === '' || addPin.length !== 4}
+          disabled={addInvalid}
         >
           הוסף עובד
         </button>
@@ -229,9 +226,9 @@ export default function Employees() {
             <div className="emp-row-actions">
               <button
                 className="btn secondary sm"
-                onClick={() => openConfirm({ kind: 'setPin', targetId: e.id, label: `שינוי PIN של ${e.name}` })}
+                onClick={() => openConfirm({ kind: 'setPin', targetId: e.id, label: `שינוי סיסמה של ${e.name}` })}
               >
-                שנה PIN
+                שנה סיסמה
               </button>
               <button
                 className={`btn sm ${e.is_active ? 'ghost' : ''}`}
@@ -259,29 +256,14 @@ export default function Employees() {
 
             {pending.kind === 'setPin' && (
               <>
-                <label>PIN חדש (4 ספרות)</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={4}
-                  className="mono"
-                  value={newPin}
-                  onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
-                  placeholder="1234"
-                />
+                <label>סיסמה חדשה</label>
+                <input type="text" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="סיסמה חדשה" />
+                <p className="muted">{PASSWORD_RULE_HINT}</p>
               </>
             )}
 
-            <label>PIN מנהל לאישור</label>
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={4}
-              className="mono"
-              value={confirmPin}
-              onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
-              placeholder="••••"
-            />
+            <label>סיסמת מנהל לאישור</label>
+            <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="סיסמה" />
 
             {modalErr && <div className="error-banner" style={{ marginTop: 12 }}>{modalErr}</div>}
 
@@ -304,9 +286,9 @@ export default function Employees() {
 
 /** Friendlier messages for the guard errors the RPCs raise. */
 function translateErr(msg: string): string {
-  if (msg.includes('unauthorized')) return 'PIN מנהל שגוי או שאינו שייך למנהל פעיל'
+  if (msg.includes('unauthorized')) return 'סיסמת מנהל שגויה או שאינה שייכת למנהל פעיל'
   if (msg.includes('last active admin')) return 'לא ניתן — חייב להישאר לפחות מנהל פעיל אחד'
-  if (msg.includes('4 digits')) return 'PIN חייב להיות 4 ספרות'
+  if (msg.includes('policy')) return 'הסיסמה אינה עומדת בדרישות (6+ תווים, אות, ספרה, סימן)'
   if (msg.includes('name is required')) return 'שם עובד חובה'
   if (msg.includes('not found')) return 'העובד לא נמצא'
   return msg
