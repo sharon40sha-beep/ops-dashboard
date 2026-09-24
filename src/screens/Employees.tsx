@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useAuth } from '../context/AuthContext'
 import { supabase } from '../utils/supabase'
 import { PASSWORD_RULE_HINT, passwordError } from '../lib/ops'
 import type { AdminEmployee, Role } from '../types'
 import Toast from '../components/Toast'
 
-type PendingKind = 'add' | 'setPin' | 'role' | 'active'
+type PendingKind = 'add' | 'setPin' | 'role' | 'active' | 'unlock'
 
 interface Pending {
   kind: PendingKind
@@ -12,16 +13,21 @@ interface Pending {
   targetId?: string
   newRole?: Role
   newActive?: boolean
+  stepUp: boolean // true -> requires re-entering the admin password
 }
 
 export default function Employees() {
-  // actor password of the logged-in admin — kept in memory only, never persisted.
-  const [gatePw, setGatePw] = useState('')
-  const [unlocked, setUnlocked] = useState(false)
+  const { adminToken, setAdminToken } = useAuth()
+
   const [rows, setRows] = useState<AdminEmployee[]>([])
-  const [loading, setLoading] = useState(false)
-  const [gateErr, setGateErr] = useState('')
+  const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState('')
+
+  // re-auth (when there is no valid admin token, e.g. after 12h expiry)
+  const [needAuth, setNeedAuth] = useState(false)
+  const [authPw, setAuthPw] = useState('')
+  const [authErr, setAuthErr] = useState('')
+  const [authBusy, setAuthBusy] = useState(false)
 
   // add-employee form
   const [addName, setAddName] = useState('')
@@ -30,35 +36,53 @@ export default function Employees() {
 
   // confirm modal
   const [pending, setPending] = useState<Pending | null>(null)
-  const [confirmPw, setConfirmPw] = useState('')
-  const [newPw, setNewPw] = useState('')
+  const [newPw, setNewPw] = useState('') // for setPin
+  const [stepPw, setStepPw] = useState('') // fresh password for step-up actions
   const [busy, setBusy] = useState(false)
   const [modalErr, setModalErr] = useState('')
 
-  async function loadRoster(actorPw: string): Promise<boolean> {
-    const { data, error } = await supabase.rpc('admin_list_employees', { actor_pin: actorPw })
-    if (error) return false
-    setRows((data as AdminEmployee[]) ?? [])
-    return true
-  }
-
-  async function unlock() {
-    setGateErr('')
-    setLoading(true)
-    const ok = await loadRoster(gatePw)
-    setLoading(false)
-    if (!ok) {
-      setGateErr('סיסמה שגויה או שאינה שייכת למנהל פעיל')
+  const load = useCallback(async () => {
+    if (!adminToken) {
+      setNeedAuth(true)
+      setLoading(false)
       return
     }
-    setUnlocked(true)
+    setLoading(true)
+    const { data, error } = await supabase.rpc('admin_list_employees', { session_token: adminToken })
+    setLoading(false)
+    if (error) {
+      // token invalid / expired -> force re-auth
+      setAdminToken(null)
+      setNeedAuth(true)
+      return
+    }
+    setRows((data as AdminEmployee[]) ?? [])
+    setNeedAuth(false)
+  }, [adminToken, setAdminToken])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  async function reauth() {
+    setAuthErr('')
+    setAuthBusy(true)
+    const { data } = await supabase.rpc('admin_login', { pin: authPw })
+    setAuthBusy(false)
+    const token = (Array.isArray(data) ? data[0]?.token : undefined) as string | undefined
+    if (!token) {
+      setAuthErr('סיסמה שגויה או שאינה שייכת למנהל פעיל')
+      return
+    }
+    setAuthPw('')
+    setAdminToken(token) // triggers load() via effect
   }
 
   function openConfirm(p: Pending) {
     setPending(p)
     setModalErr('')
     setNewPw('')
-    setConfirmPw(gatePw) // prefill with the admin password already entered (editable)
+    setStepPw('')
   }
 
   function closeConfirm() {
@@ -66,13 +90,13 @@ export default function Employees() {
     setBusy(false)
     setModalErr('')
     setNewPw('')
+    setStepPw('')
   }
 
   async function execute() {
-    if (!pending) return
+    if (!pending || !adminToken) return
     setModalErr('')
 
-    // client-side sanity checks (server is authoritative)
     if (pending.kind === 'add') {
       if (addName.trim() === '') return setModalErr('שם עובד חובה')
       const pe = passwordError(addPw)
@@ -82,92 +106,102 @@ export default function Employees() {
       const pe = passwordError(newPw)
       if (pe) return setModalErr(pe)
     }
-    if (!confirmPw) return setModalErr('נדרשת סיסמת מנהל לאישור')
+    if (pending.stepUp && stepPw === '') return setModalErr('נדרשת אימות סיסמה שלך')
 
     setBusy(true)
     let error = null as { message: string } | null
-    if (pending.kind === 'add') {
-      ;({ error } = await supabase.rpc('admin_add_employee', {
-        actor_pin: confirmPw,
-        new_name: addName.trim(),
-        new_pin: addPw,
-        new_role: addRole,
-      }))
-    } else if (pending.kind === 'setPin') {
-      ;({ error } = await supabase.rpc('admin_set_pin', {
-        actor_pin: confirmPw,
-        target_id: pending.targetId,
-        new_pin: newPw,
-      }))
-    } else if (pending.kind === 'role') {
+    if (pending.kind === 'role') {
       ;({ error } = await supabase.rpc('admin_set_role', {
-        actor_pin: confirmPw,
+        session_token: adminToken,
         target_id: pending.targetId,
         new_role: pending.newRole,
       }))
     } else if (pending.kind === 'active') {
       ;({ error } = await supabase.rpc('admin_set_active', {
-        actor_pin: confirmPw,
+        session_token: adminToken,
         target_id: pending.targetId,
         new_active: pending.newActive,
+      }))
+    } else if (pending.kind === 'setPin') {
+      ;({ error } = await supabase.rpc('admin_set_pin', {
+        session_token: adminToken,
+        target_id: pending.targetId,
+        new_pin: newPw,
+      }))
+    } else if (pending.kind === 'unlock') {
+      ;({ error } = await supabase.rpc('admin_unlock_employee', {
+        session_token: adminToken,
+        actor_pin: stepPw,
+        target_id: pending.targetId,
+      }))
+    } else if (pending.kind === 'add') {
+      ;({ error } = await supabase.rpc('admin_add_employee', {
+        session_token: adminToken,
+        actor_pin: stepPw,
+        new_name: addName.trim(),
+        new_pin: addPw,
+        new_role: addRole,
       }))
     }
 
     if (error) {
       setBusy(false)
+      if (error.message.includes('session')) {
+        // token expired mid-session
+        setAdminToken(null)
+        setNeedAuth(true)
+        closeConfirm()
+        return
+      }
       setModalErr(translateErr(error.message))
       return
     }
 
-    const ok = await loadRoster(gatePw)
-    setBusy(false)
     if (pending.kind === 'add') {
       setAddName('')
       setAddPw('')
       setAddRole('operator')
     }
+    setBusy(false)
     setToast('בוצע')
     closeConfirm()
-    if (!ok) {
-      // e.g. the admin changed their own password/role — force re-auth
-      setUnlocked(false)
-      setGatePw('')
-      setGateErr('ההרשאה השתנתה — הזן/י שוב סיסמת מנהל')
-    }
+    void load()
   }
 
   // -------------------------------------------------------------------------
 
-  if (!unlocked) {
+  if (needAuth) {
     return (
       <div>
         <div className="card">
           <h2>ניהול עובדים — אימות מנהל</h2>
-          <p className="muted">מסך זה חשוף למנהלים בלבד. הזן/י את סיסמתך כדי לטעון את הרשימה.</p>
+          <p className="muted">פג תוקף החיבור או שאינך מחובר כמנהל. הזן/י את סיסמתך.</p>
           <label>סיסמת מנהל</label>
           <input
             type="password"
-            value={gatePw}
-            onChange={(e) => setGatePw(e.target.value)}
+            value={authPw}
+            onChange={(e) => setAuthPw(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') void unlock()
+              if (e.key === 'Enter') void reauth()
             }}
             placeholder="סיסמה"
           />
-          {gateErr && <div className="error-banner" style={{ marginTop: 12 }}>{gateErr}</div>}
-          <button className="btn" onClick={() => void unlock()} disabled={loading || gatePw === ''}>
-            {loading ? 'טוען…' : 'טען רשימה'}
+          {authErr && <div className="error-banner" style={{ marginTop: 12 }}>{authErr}</div>}
+          <button className="btn" onClick={() => void reauth()} disabled={authBusy || authPw === ''}>
+            {authBusy ? 'בודק…' : 'התחבר'}
           </button>
         </div>
       </div>
     )
   }
 
+  if (loading) return <div className="center-screen">טוען…</div>
+
   const addInvalid = addName.trim() === '' || passwordError(addPw) !== null
 
   return (
     <div>
-      {/* Add employee */}
+      {/* Add employee (step-up) */}
       <div className="card">
         <h2>הוספת עובד</h2>
         <label>שם</label>
@@ -188,7 +222,7 @@ export default function Employees() {
         <p className="muted">{PASSWORD_RULE_HINT}</p>
         <button
           className="btn"
-          onClick={() => openConfirm({ kind: 'add', label: `הוספת עובד: ${addName.trim() || '—'}` })}
+          onClick={() => openConfirm({ kind: 'add', stepUp: true, label: `הוספת עובד: ${addName.trim() || '—'}` })}
           disabled={addInvalid}
         >
           הוסף עובד
@@ -204,6 +238,7 @@ export default function Employees() {
               <div>
                 <span className="emp-row-name">{e.name}</span>
                 {!e.is_active && <span className="badge-off">מושבת</span>}
+                {e.is_locked && <span className="badge-off">נעול</span>}
               </div>
               <select
                 className="role-select"
@@ -215,6 +250,7 @@ export default function Employees() {
                       kind: 'role',
                       targetId: e.id,
                       newRole: nr,
+                      stepUp: false,
                       label: `שינוי הרשאה של ${e.name} ל-${nr === 'admin' ? 'מנהל' : 'מפעיל'}`,
                     })
                 }}
@@ -226,10 +262,18 @@ export default function Employees() {
             <div className="emp-row-actions">
               <button
                 className="btn secondary sm"
-                onClick={() => openConfirm({ kind: 'setPin', targetId: e.id, label: `שינוי סיסמה של ${e.name}` })}
+                onClick={() => openConfirm({ kind: 'setPin', targetId: e.id, stepUp: false, label: `שינוי סיסמה של ${e.name}` })}
               >
                 שנה סיסמה
               </button>
+              {e.is_locked && (
+                <button
+                  className="btn sm"
+                  onClick={() => openConfirm({ kind: 'unlock', targetId: e.id, stepUp: true, label: `שחרור נעילה: ${e.name}` })}
+                >
+                  שחרר נעילה
+                </button>
+              )}
               <button
                 className={`btn sm ${e.is_active ? 'ghost' : ''}`}
                 onClick={() =>
@@ -237,6 +281,7 @@ export default function Employees() {
                     kind: 'active',
                     targetId: e.id,
                     newActive: !e.is_active,
+                    stepUp: false,
                     label: e.is_active ? `השבתת גישה: ${e.name}` : `הפעלה מחדש: ${e.name}`,
                   })
                 }
@@ -262,8 +307,13 @@ export default function Employees() {
               </>
             )}
 
-            <label>סיסמת מנהל לאישור</label>
-            <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="סיסמה" />
+            {pending.stepUp && (
+              <>
+                <label>אמת/י שוב את הסיסמה שלך</label>
+                <input type="password" value={stepPw} onChange={(e) => setStepPw(e.target.value)} placeholder="הסיסמה שלך" />
+                <p className="muted">פעולה רגישה — נדרש אימות סיסמה מחדש.</p>
+              </>
+            )}
 
             {modalErr && <div className="error-banner" style={{ marginTop: 12 }}>{modalErr}</div>}
 
@@ -284,9 +334,9 @@ export default function Employees() {
   )
 }
 
-/** Friendlier messages for the guard errors the RPCs raise. */
 function translateErr(msg: string): string {
-  if (msg.includes('unauthorized')) return 'סיסמת מנהל שגויה או שאינה שייכת למנהל פעיל'
+  if (msg.includes('step-up')) return 'הסיסמה שהזנת שגויה'
+  if (msg.includes('session')) return 'פג תוקף החיבור — התחבר/י מחדש'
   if (msg.includes('last active admin')) return 'לא ניתן — חייב להישאר לפחות מנהל פעיל אחד'
   if (msg.includes('policy')) return 'הסיסמה אינה עומדת בדרישות (6+ תווים, אות, ספרה, סימן)'
   if (msg.includes('name is required')) return 'שם עובד חובה'

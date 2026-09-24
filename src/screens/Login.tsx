@@ -2,15 +2,16 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { supabase } from '../utils/supabase'
-import { fmtDateTime } from '../lib/ops'
+import { retryText } from '../lib/ops'
 import type { Employee, Role } from '../types'
 
-/** Row shape returned by verify_pin() — id set on success; locked_until set when locked. */
+/** Row shape returned by verify_pin() — id set on success; retry set when locked. */
 interface VerifyRow {
   id: string | null
   name: string | null
   role: Role | null
   locked_until: string | null
+  retry_after_seconds: number | null
 }
 
 export default function Login() {
@@ -39,12 +40,21 @@ export default function Login() {
     const row = (Array.isArray(data) ? data[0] : undefined) as VerifyRow | undefined
 
     if (row && row.id && row.name && row.role) {
-      login({ employeeId: row.id, name: row.name, role: row.role })
+      const emp = { employeeId: row.id, name: row.name, role: row.role }
+      // For an admin, mint a 12h admin session token so admin screens don't
+      // ask for the password again.
+      if (row.role === 'admin') {
+        const { data: t } = await supabase.rpc('admin_login', { pin: password })
+        const token = (Array.isArray(t) ? t[0]?.token : undefined) as string | undefined
+        login(emp, token ?? null)
+      } else {
+        login(emp, null)
+      }
       return
     }
-    if (row && row.locked_until) {
+    if (row && row.retry_after_seconds != null) {
       setPassword('')
-      setMsg(`החשבון נעול עקב ניסיונות כושלים. נסה/י שוב אחרי ${fmtDateTime(row.locked_until)}`)
+      setMsg(`החשבון נעול עקב ניסיונות כושלים. נסה/י שוב ${retryText(row.retry_after_seconds)}`)
       return
     }
     setPassword('')

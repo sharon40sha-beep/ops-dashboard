@@ -19,6 +19,7 @@ export interface AdminEmployee {
   name: string
   role: Role
   is_active: boolean
+  is_locked: boolean
 }
 
 /** One row from the login_attempts audit log (admin_list_login_attempts RPC). */

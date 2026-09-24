@@ -32,6 +32,7 @@ npm run dev               # http://localhost:5173
 3. `supabase/migrations/0003_grants.sql` — הרשאות Postgres ל-anon (מתקן `42501`).
 4. `supabase/migrations/0004_admin_employees.sql` — `is_active` + RPCs לניהול עובדים.
 5. `supabase/migrations/0005_passwords.sql` — סיסמאות עם hash (bcrypt), מדיניות סיסמה, נעילה אחרי כשלים, ולוג כניסות.
+6. `supabase/migrations/0006_admin_sessions.sql` — session tokens למנהל (12ש'), step-up לפעולות רגישות, ותיקון תצוגת זמן הנעילה.
 
 כל הקבצים idempotent (אפשר להריץ שוב).
 
@@ -60,6 +61,12 @@ select * from public.employees;                -- אמור להיכשל/להחז
 - **לוג כניסות:** כל ניסיון נכתב ל-`login_attempts`; מסך "כניסות" (Admin) מציג את האחרונים דרך `admin_list_login_attempts`.
 
 שום סיסמה/hash לא מגיע לדפדפן. ה-session (מי מחובר במכשיר) נשמר ב-`localStorage` בלבד. אין Supabase Auth.
+
+**Session tokens למנהל (0006):** במקום להזין סיסמה בכל פעולת ניהול — בכניסה כמנהל
+נוצר **token** ל-12 שעות (`admin_login`, טבלת `admin_sessions`) שנשמר ב-`localStorage`,
+וכל ה-RPCים הניהוליים מאומתים מולו. יציאה קוראת ל-`admin_logout`. **Step-up:** שתי
+פעולות רגישות — **הוספת עובד** ו**שחרור נעילת חשבון** — דורשות אימות סיסמה מחדש
+(`actor_pin`) בנוסף ל-token. השבתה/הורדת role של מנהל מבטלת מיד את ה-tokens שלו.
 
 > החלף את הסיסמאות הזמניות של ה-seed דרך מסך "עובדים" מיד אחרי ההתחברות הראשונה.
 

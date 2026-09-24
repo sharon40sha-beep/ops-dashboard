@@ -1,68 +1,91 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useAuth } from '../context/AuthContext'
 import { supabase } from '../utils/supabase'
 import { fmtDateTime, loginReasonHe } from '../lib/ops'
 import type { LoginAttempt } from '../types'
 
 export default function LoginAttempts() {
-  const [gatePw, setGatePw] = useState('')
-  const [unlocked, setUnlocked] = useState(false)
+  const { adminToken, setAdminToken } = useAuth()
   const [rows, setRows] = useState<LoginAttempt[]>([])
-  const [loading, setLoading] = useState(false)
-  const [err, setErr] = useState('')
+  const [loading, setLoading] = useState(true)
 
-  async function load(actorPw: string): Promise<boolean> {
-    const { data, error } = await supabase.rpc('admin_list_login_attempts', {
-      actor_pin: actorPw,
-      limit_count: 100,
-    })
-    if (error) return false
-    setRows((data as LoginAttempt[]) ?? [])
-    return true
-  }
+  const [needAuth, setNeedAuth] = useState(false)
+  const [authPw, setAuthPw] = useState('')
+  const [authErr, setAuthErr] = useState('')
+  const [authBusy, setAuthBusy] = useState(false)
 
-  async function unlock() {
-    setErr('')
-    setLoading(true)
-    const ok = await load(gatePw)
-    setLoading(false)
-    if (!ok) {
-      setErr('סיסמה שגויה או שאינה שייכת למנהל פעיל')
+  const load = useCallback(async () => {
+    if (!adminToken) {
+      setNeedAuth(true)
+      setLoading(false)
       return
     }
-    setUnlocked(true)
+    setLoading(true)
+    const { data, error } = await supabase.rpc('admin_list_login_attempts', {
+      session_token: adminToken,
+      limit_count: 100,
+    })
+    setLoading(false)
+    if (error) {
+      setAdminToken(null)
+      setNeedAuth(true)
+      return
+    }
+    setRows((data as LoginAttempt[]) ?? [])
+    setNeedAuth(false)
+  }, [adminToken, setAdminToken])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  async function reauth() {
+    setAuthErr('')
+    setAuthBusy(true)
+    const { data } = await supabase.rpc('admin_login', { pin: authPw })
+    setAuthBusy(false)
+    const token = (Array.isArray(data) ? data[0]?.token : undefined) as string | undefined
+    if (!token) {
+      setAuthErr('סיסמה שגויה או שאינה שייכת למנהל פעיל')
+      return
+    }
+    setAuthPw('')
+    setAdminToken(token)
   }
 
-  if (!unlocked) {
+  if (needAuth) {
     return (
       <div>
         <div className="card">
           <h2>לוג כניסות — אימות מנהל</h2>
-          <p className="muted">מסך זה חשוף למנהלים בלבד. הזן/י את סיסמתך כדי לצפות בלוג.</p>
+          <p className="muted">פג תוקף החיבור או שאינך מחובר כמנהל. הזן/י את סיסמתך.</p>
           <label>סיסמת מנהל</label>
           <input
             type="password"
-            value={gatePw}
-            onChange={(e) => setGatePw(e.target.value)}
+            value={authPw}
+            onChange={(e) => setAuthPw(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') void unlock()
+              if (e.key === 'Enter') void reauth()
             }}
             placeholder="סיסמה"
           />
-          {err && <div className="error-banner" style={{ marginTop: 12 }}>{err}</div>}
-          <button className="btn" onClick={() => void unlock()} disabled={loading || gatePw === ''}>
-            {loading ? 'טוען…' : 'הצג לוג'}
+          {authErr && <div className="error-banner" style={{ marginTop: 12 }}>{authErr}</div>}
+          <button className="btn" onClick={() => void reauth()} disabled={authBusy || authPw === ''}>
+            {authBusy ? 'בודק…' : 'התחבר'}
           </button>
         </div>
       </div>
     )
   }
 
+  if (loading) return <div className="center-screen">טוען…</div>
+
   return (
     <div>
       <div className="card">
         <div className="card-head-row">
           <h2 style={{ margin: 0 }}>לוג כניסות ({rows.length})</h2>
-          <button className="btn secondary sm" onClick={() => void load(gatePw)}>
+          <button className="btn secondary sm" onClick={() => void load()}>
             רענן
           </button>
         </div>

@@ -82,6 +82,14 @@ export function passwordError(pw: string): string | null {
   return null
 }
 
+/** "בעוד X דקות" from a server-computed seconds-remaining value (no client clock math). */
+export function retryText(seconds: number): string {
+  const s = Math.max(0, Math.ceil(seconds))
+  if (s <= 60) return 'בעוד כדקה'
+  const m = Math.ceil(s / 60)
+  return `בעוד כ-${m} דקות`
+}
+
 /** Human-readable Hebrew reason for a login_attempts row. */
 export function loginReasonHe(reason: string | null, success: boolean): string {
   if (success) return 'הצלחה'
