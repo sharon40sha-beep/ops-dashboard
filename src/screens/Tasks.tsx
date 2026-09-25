@@ -137,9 +137,15 @@ function TaskDetail({
   const [vehicle, setVehicle] = useState(task.vehicle)
   const [route, setRoute] = useState(task.route)
   const [reason, setReason] = useState('')
+  const [skipNote, setSkipNote] = useState('')
 
   const deviated = vehicle.trim() !== task.vehicle.trim() || route.trim() !== task.route.trim()
-  const allChecked = task.checklist.length > 0 && task.checklist.every((c) => c.checked)
+  const hasUnchecked = task.checklist.some((c) => !c.checked)
+  // critical items float to the top as guidance (does not change behaviour)
+  const orderedItems = task.checklist
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => Number(b.c.critical ?? false) - Number(a.c.critical ?? false))
+  const canStart = !busy && (!hasUnchecked || skipNote.trim() !== '')
 
   function onRpcError(message: string) {
     if (message.includes('session')) {
@@ -171,7 +177,11 @@ function TaskDetail({
     if (!token) return
     setErr('')
     setBusy(true)
-    const { error } = await supabase.rpc('start_task', { session_token: token, task_id: task.id })
+    const { error } = await supabase.rpc('start_task', {
+      session_token: token,
+      task_id: task.id,
+      skip_note: hasUnchecked ? skipNote.trim() : '',
+    })
     setBusy(false)
     if (error) return onRpcError(error.message)
     onSaved('המשימה הופעלה')
@@ -232,7 +242,7 @@ function TaskDetail({
         <div className="card">
           <h2>צ'קליסט יציאה</h2>
           <div className="checklist">
-            {task.checklist.map((c, i) => (
+            {orderedItems.map(({ c, i }) => (
               <button
                 key={i}
                 className={`check-row ${c.checked ? 'checked' : ''}`}
@@ -241,24 +251,37 @@ function TaskDetail({
               >
                 <span className="check-box" />
                 <span className="check-label">{c.label}</span>
+                {c.critical && <span className="crit-badge">קריטי</span>}
               </button>
             ))}
           </div>
+
+          {hasUnchecked && (
+            <>
+              <label>יש סעיפים שלא סומנו — למה דילגת? (חובה)</label>
+              <textarea
+                rows={2}
+                value={skipNote}
+                onChange={(e) => setSkipNote(e.target.value)}
+                placeholder="הסבר קצר לדילוג על הסעיפים"
+              />
+            </>
+          )}
+
           {err && <div className="error-banner" style={{ marginTop: 12 }}>{err}</div>}
-          <button className="btn" onClick={() => void start()} disabled={!allChecked || busy}>
+          <button className="btn" onClick={() => void start()} disabled={!canStart}>
             {busy ? 'שומר…' : 'התחל משימה'}
           </button>
-          {!allChecked && <p className="muted" style={{ textAlign: 'center', marginTop: 8 }}>יש לסמן את כל הסעיפים כדי להתחיל</p>}
+          {hasUnchecked && skipNote.trim() === '' && (
+            <p className="muted" style={{ textAlign: 'center', marginTop: 8 }}>
+              מלא/י הערת דילוג כדי להתחיל
+            </p>
+          )}
         </div>
       )}
 
       {task.status === 'active' && (
         <div className="card">
-          <div className="gps">
-            <span className="gps-pulse" />
-            <span className="gps-text">GPS פעיל</span>
-          </div>
-
           {!showComplete ? (
             <button className="btn" onClick={() => setShowComplete(true)}>
               השלם משימה

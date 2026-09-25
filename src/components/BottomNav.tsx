@@ -1,13 +1,12 @@
 import type { Role } from '../types'
 
-export type Tab = 'tasks' | 'create' | 'history' | 'employees' | 'attempts'
+export type Tab = 'tasks' | 'create' | 'history' | 'admin'
 
 const TABS: { id: Tab; label: string; icon: string; adminOnly?: boolean }[] = [
   { id: 'tasks', label: 'משימות', icon: '☑️' },
   { id: 'create', label: 'יצירה', icon: '➕', adminOnly: true },
   { id: 'history', label: 'היסטוריה', icon: '🗂️' },
-  { id: 'employees', label: 'עובדים', icon: '👤', adminOnly: true },
-  { id: 'attempts', label: 'כניסות', icon: '🔐', adminOnly: true },
+  { id: 'admin', label: 'ניהול', icon: '⚙️', adminOnly: true },
 ]
 
 export default function BottomNav({

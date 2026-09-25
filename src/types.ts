@@ -35,16 +35,48 @@ export interface LoginAttempt {
 export interface Site {
   id: string // 'S01'..'S06' warehouses, 'S07' factory, extendable
   kind: SiteKind
+  is_active?: boolean
 }
 
 export interface Asset {
   id: string // 'A1'..'A6'
   home_site_id: string
+  is_active?: boolean
+}
+
+export interface Route {
+  id: string
+  is_active: boolean
+}
+
+export interface Vehicle {
+  id: string
+  is_active: boolean
 }
 
 export interface ChecklistItem {
   label: string
   checked: boolean
+  critical?: boolean
+}
+
+/** Managed checklist template row (admin content management). */
+export interface ChecklistTemplateItem {
+  id: string
+  label: string
+  critical: boolean
+  sort_order: number
+  is_active: boolean
+}
+
+/** Result of admin_asset_summary(). */
+export interface AssetSummary {
+  total: number
+  deviated: number
+  hours: { hour: number; count: number }[]
+  by_vehicle: { key: string; count: number }[]
+  by_route: { key: string; count: number }[]
+  by_worker: { key: string; count: number }[]
 }
 
 export interface TaskActual {

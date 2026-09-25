@@ -7,10 +7,18 @@ import Toast from '../components/Toast'
 
 export default function Create() {
   const { session, token, logout } = useAuth()
-  const { assets, sites, sitesById, employees, refresh } = useData()
+  const { assets, sites, sitesById, routes, vehicles, employees, refresh } = useData()
 
-  const sortedAssets = useMemo(() => [...assets].sort((a, b) => (a.id < b.id ? -1 : 1)), [assets])
-  const sortedSites = useMemo(() => [...sites].sort((a, b) => (a.id < b.id ? -1 : 1)), [sites])
+  const sortedAssets = useMemo(
+    () => assets.filter((a) => a.is_active !== false).sort((a, b) => (a.id < b.id ? -1 : 1)),
+    [assets],
+  )
+  const sortedSites = useMemo(
+    () => sites.filter((s) => s.is_active !== false).sort((a, b) => (a.id < b.id ? -1 : 1)),
+    [sites],
+  )
+  const activeRoutes = useMemo(() => routes.filter((r) => r.is_active), [routes])
+  const activeVehicles = useMemo(() => vehicles.filter((v) => v.is_active), [vehicles])
 
   const [assetId, setAssetId] = useState('')
   const [fromSite, setFromSite] = useState('')
@@ -123,11 +131,21 @@ export default function Create() {
         <div style={{ display: 'flex', gap: 12 }}>
           <div style={{ flex: 1 }}>
             <label>קוד רכב</label>
-            <input className="mono" type="text" value={vehicle} placeholder="לדוגמה V-12" onChange={(e) => setVehicle(e.target.value)} />
+            <select value={vehicle} onChange={(e) => setVehicle(e.target.value)}>
+              <option value="">— בחר רכב —</option>
+              {activeVehicles.map((v) => (
+                <option key={v.id} value={v.id}>{v.id}</option>
+              ))}
+            </select>
           </div>
           <div style={{ flex: 1 }}>
             <label>ציר</label>
-            <input className="mono" type="text" value={route} placeholder="Blue / Green / Red" onChange={(e) => setRoute(e.target.value)} />
+            <select value={route} onChange={(e) => setRoute(e.target.value)}>
+              <option value="">— בחר ציר —</option>
+              {activeRoutes.map((r) => (
+                <option key={r.id} value={r.id}>{r.id}</option>
+              ))}
+            </select>
           </div>
         </div>
 

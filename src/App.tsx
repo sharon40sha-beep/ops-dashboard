@@ -6,8 +6,7 @@ import Login from './screens/Login'
 import Tasks from './screens/Tasks'
 import Create from './screens/Create'
 import History from './screens/History'
-import Employees from './screens/Employees'
-import LoginAttempts from './screens/LoginAttempts'
+import AdminHub from './screens/AdminHub'
 
 function Shell() {
   const { session, logout } = useAuth()
@@ -17,7 +16,7 @@ function Shell() {
   if (!session) return <Login />
 
   // Operators can't reach admin-only screens.
-  const adminOnly: Tab[] = ['create', 'employees', 'attempts']
+  const adminOnly: Tab[] = ['create', 'admin']
   const activeTab: Tab = adminOnly.includes(tab) && session.role !== 'admin' ? 'tasks' : tab
 
   return (
@@ -40,8 +39,7 @@ function Shell() {
         {activeTab === 'tasks' && <Tasks />}
         {activeTab === 'create' && <Create />}
         {activeTab === 'history' && <History />}
-        {activeTab === 'employees' && <Employees />}
-        {activeTab === 'attempts' && <LoginAttempts />}
+        {activeTab === 'admin' && <AdminHub />}
       </div>
       <BottomNav tab={activeTab} role={session.role} onChange={setTab} />
     </>

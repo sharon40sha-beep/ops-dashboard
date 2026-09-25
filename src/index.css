@@ -689,3 +689,153 @@ input.mono {
   background: rgba(224, 108, 90, 0.15);
   color: var(--danger);
 }
+
+/* ---------- Textarea (matches inputs) ---------- */
+textarea {
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 16px;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+}
+textarea:focus {
+  border-color: var(--accent);
+}
+
+/* ---------- Segmented control ---------- */
+.segmented {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+}
+.segmented button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  padding: 10px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.segmented button.active {
+  background: var(--accent);
+  color: #14161c;
+}
+
+/* ---------- Stat tiles ---------- */
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.stat {
+  background: var(--card-2);
+  border-radius: 12px;
+  padding: 14px;
+}
+.stat .value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.stat .label {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 2px 0 0;
+}
+
+/* ---------- Bars (learning board) ---------- */
+.bar-row {
+  margin: 10px 0;
+}
+.bar-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.bar-key {
+  color: var(--text);
+}
+.bar-val {
+  color: var(--text-dim);
+}
+.bar-track {
+  height: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+/* ---------- Critical badge (checklist) ---------- */
+.crit-badge {
+  margin-inline-start: auto;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(224, 108, 90, 0.15);
+  color: var(--danger);
+}
+
+/* ---------- Inline checkbox label ---------- */
+.inline-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 0;
+}
+.inline-check input {
+  width: auto;
+}
+
+/* ---------- Admin hub ---------- */
+.hub-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.hub-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  text-align: start;
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hub-card:active {
+  border-color: var(--accent);
+}
+.hub-icon {
+  font-size: 24px;
+}
+.hub-label {
+  font-size: 15px;
+  font-weight: 700;
+}
+.hub-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+}

@@ -9,13 +9,15 @@ import {
 } from 'react'
 import { supabase } from '../utils/supabase'
 import { useAuth } from './AuthContext'
-import type { Asset, Employee, Site, Task } from '../types'
+import type { Asset, Employee, Route, Site, Task, Vehicle } from '../types'
 
 interface DataValue {
   employees: Employee[]
   sites: Site[]
   sitesById: Map<string, Site>
   assets: Asset[]
+  routes: Route[]
+  vehicles: Vehicle[]
   /** Open (non-completed) tasks visible to the current user. */
   tasks: Task[]
   /** Completed tasks visible to the current user. */
@@ -23,6 +25,8 @@ interface DataValue {
   loading: boolean
   error: string | null
   refresh: () => Promise<void>
+  /** re-pull reference lists (assets/sites/routes/vehicles) after admin edits */
+  refreshReference: () => Promise<void>
 }
 
 const DataContext = createContext<DataValue | null>(null)
@@ -34,6 +38,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [sites, setSites] = useState<Site[]>([])
   const [assets, setAssets] = useState<Asset[]>([])
+  const [routes, setRoutes] = useState<Route[]>([])
+  const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [history, setHistory] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,14 +49,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Reference data (open with the anon key): employee login list + sites + assets.
   const loadReference = useCallback(async () => {
-    const [emp, sit, ast] = await Promise.all([
+    const [emp, sit, ast, rou, veh] = await Promise.all([
       supabase.rpc('list_login_employees'),
       supabase.from('sites').select('*').order('id'),
       supabase.from('assets').select('*').order('id'),
+      supabase.from('routes').select('*').order('id'),
+      supabase.from('vehicles').select('*').order('id'),
     ])
     if (!emp.error) setEmployees((emp.data as Employee[]) ?? [])
     if (!sit.error) setSites((sit.data as Site[]) ?? [])
     if (!ast.error) setAssets((ast.data as Asset[]) ?? [])
+    if (!rou.error) setRoutes((rou.data as Route[]) ?? [])
+    if (!veh.error) setVehicles((veh.data as Vehicle[]) ?? [])
   }, [])
 
   // Tasks + history now come through session-scoped RPCs (Part B).
@@ -107,8 +117,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const sitesById = useMemo(() => new Map(sites.map((s) => [s.id, s])), [sites])
 
   const value = useMemo<DataValue>(
-    () => ({ employees, sites, sitesById, assets, tasks, history, loading, error, refresh }),
-    [employees, sites, sitesById, assets, tasks, history, loading, error, refresh],
+    () => ({
+      employees, sites, sitesById, assets, routes, vehicles,
+      tasks, history, loading, error, refresh, refreshReference: loadReference,
+    }),
+    [employees, sites, sitesById, assets, routes, vehicles, tasks, history, loading, error, refresh, loadReference],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
