@@ -12,6 +12,7 @@ interface VerifyRow {
   role: Role | null
   locked_until: string | null
   retry_after_seconds: number | null
+  session_token: string | null
 }
 
 export default function Login() {
@@ -39,17 +40,10 @@ export default function Login() {
     }
     const row = (Array.isArray(data) ? data[0] : undefined) as VerifyRow | undefined
 
-    if (row && row.id && row.name && row.role) {
-      const emp = { employeeId: row.id, name: row.name, role: row.role }
-      // For an admin, mint a 12h admin session token so admin screens don't
-      // ask for the password again.
-      if (row.role === 'admin') {
-        const { data: t } = await supabase.rpc('admin_login', { pin: password })
-        const token = (Array.isArray(t) ? t[0]?.token : undefined) as string | undefined
-        login(emp, token ?? null)
-      } else {
-        login(emp, null)
-      }
+    if (row && row.id && row.name && row.role && row.session_token) {
+      // verify_pin mints one server session for every employee and returns the
+      // token; it is used for all subsequent RPC calls.
+      login({ employeeId: row.id, name: row.name, role: row.role }, row.session_token)
       return
     }
     if (row && row.retry_after_seconds != null) {

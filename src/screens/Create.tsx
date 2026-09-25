@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { supabase } from '../utils/supabase'
-import { auditLine, buildDefaultChecklist, DEFAULT_TO_SITE, siteKindHe } from '../lib/ops'
+import { DEFAULT_TO_SITE, siteKindHe } from '../lib/ops'
 import Toast from '../components/Toast'
 
 export default function Create() {
-  const { session } = useAuth()
+  const { session, token, logout } = useAuth()
   const { assets, sites, sitesById, employees, refresh } = useData()
 
   const sortedAssets = useMemo(() => [...assets].sort((a, b) => (a.id < b.id ? -1 : 1)), [assets])
@@ -41,10 +41,13 @@ export default function Create() {
     setErr('')
     if (!activeAsset || !effectiveFrom || !effectiveTo) return setErr('יש לבחור מוצר, מאתר ולאתר')
     if (!workerId) return setErr('יש לבחור עובד מבצע')
-    if (!session) return
+    if (!session || !token) return
 
     setSaving(true)
-    const { error } = await supabase.from('tasks').insert({
+    // tasks table is closed — create through the admin-only RPC (server sets the
+    // default checklist + initial audit log).
+    const { error } = await supabase.rpc('create_task', {
+      session_token: token,
       asset_id: activeAsset,
       from_site_id: effectiveFrom,
       to_site_id: effectiveTo,
@@ -52,13 +55,10 @@ export default function Create() {
       vehicle: vehicle.trim(),
       route: route.trim(),
       time_window: timeWindow.trim(),
-      status: 'planned',
-      checklist: buildDefaultChecklist(),
-      actual: null,
-      audit_log: [auditLine('Task created')],
     })
     setSaving(false)
     if (error) {
+      if (error.message.includes('session')) return logout()
       setErr(error.message)
       return
     }

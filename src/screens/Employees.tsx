@@ -17,17 +17,11 @@ interface Pending {
 }
 
 export default function Employees() {
-  const { adminToken, setAdminToken } = useAuth()
+  const { token, logout } = useAuth()
 
   const [rows, setRows] = useState<AdminEmployee[]>([])
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState('')
-
-  // re-auth (when there is no valid admin token, e.g. after 12h expiry)
-  const [needAuth, setNeedAuth] = useState(false)
-  const [authPw, setAuthPw] = useState('')
-  const [authErr, setAuthErr] = useState('')
-  const [authBusy, setAuthBusy] = useState(false)
 
   // add-employee form
   const [addName, setAddName] = useState('')
@@ -42,41 +36,23 @@ export default function Employees() {
   const [modalErr, setModalErr] = useState('')
 
   const load = useCallback(async () => {
-    if (!adminToken) {
-      setNeedAuth(true)
-      setLoading(false)
+    if (!token) {
+      logout()
       return
     }
     setLoading(true)
-    const { data, error } = await supabase.rpc('admin_list_employees', { session_token: adminToken })
+    const { data, error } = await supabase.rpc('admin_list_employees', { session_token: token })
     setLoading(false)
     if (error) {
-      // token invalid / expired -> force re-auth
-      setAdminToken(null)
-      setNeedAuth(true)
+      logout() // expired/invalid session -> back to login
       return
     }
     setRows((data as AdminEmployee[]) ?? [])
-    setNeedAuth(false)
-  }, [adminToken, setAdminToken])
+  }, [token, logout])
 
   useEffect(() => {
     void load()
   }, [load])
-
-  async function reauth() {
-    setAuthErr('')
-    setAuthBusy(true)
-    const { data } = await supabase.rpc('admin_login', { pin: authPw })
-    setAuthBusy(false)
-    const token = (Array.isArray(data) ? data[0]?.token : undefined) as string | undefined
-    if (!token) {
-      setAuthErr('סיסמה שגויה או שאינה שייכת למנהל פעיל')
-      return
-    }
-    setAuthPw('')
-    setAdminToken(token) // triggers load() via effect
-  }
 
   function openConfirm(p: Pending) {
     setPending(p)
@@ -84,7 +60,6 @@ export default function Employees() {
     setNewPw('')
     setStepPw('')
   }
-
   function closeConfirm() {
     setPending(null)
     setBusy(false)
@@ -94,7 +69,7 @@ export default function Employees() {
   }
 
   async function execute() {
-    if (!pending || !adminToken) return
+    if (!pending || !token) return
     setModalErr('')
 
     if (pending.kind === 'add') {
@@ -112,31 +87,31 @@ export default function Employees() {
     let error = null as { message: string } | null
     if (pending.kind === 'role') {
       ;({ error } = await supabase.rpc('admin_set_role', {
-        session_token: adminToken,
+        session_token: token,
         target_id: pending.targetId,
         new_role: pending.newRole,
       }))
     } else if (pending.kind === 'active') {
       ;({ error } = await supabase.rpc('admin_set_active', {
-        session_token: adminToken,
+        session_token: token,
         target_id: pending.targetId,
         new_active: pending.newActive,
       }))
     } else if (pending.kind === 'setPin') {
       ;({ error } = await supabase.rpc('admin_set_pin', {
-        session_token: adminToken,
+        session_token: token,
         target_id: pending.targetId,
         new_pin: newPw,
       }))
     } else if (pending.kind === 'unlock') {
       ;({ error } = await supabase.rpc('admin_unlock_employee', {
-        session_token: adminToken,
+        session_token: token,
         actor_pin: stepPw,
         target_id: pending.targetId,
       }))
     } else if (pending.kind === 'add') {
       ;({ error } = await supabase.rpc('admin_add_employee', {
-        session_token: adminToken,
+        session_token: token,
         actor_pin: stepPw,
         new_name: addName.trim(),
         new_pin: addPw,
@@ -146,11 +121,9 @@ export default function Employees() {
 
     if (error) {
       setBusy(false)
-      if (error.message.includes('session')) {
-        // token expired mid-session
-        setAdminToken(null)
-        setNeedAuth(true)
-        closeConfirm()
+      // step-up failure is expected user error; a bad session sends us to login
+      if (error.message.includes('session') && !error.message.includes('step-up')) {
+        logout()
         return
       }
       setModalErr(translateErr(error.message))
@@ -169,31 +142,6 @@ export default function Employees() {
   }
 
   // -------------------------------------------------------------------------
-
-  if (needAuth) {
-    return (
-      <div>
-        <div className="card">
-          <h2>ניהול עובדים — אימות מנהל</h2>
-          <p className="muted">פג תוקף החיבור או שאינך מחובר כמנהל. הזן/י את סיסמתך.</p>
-          <label>סיסמת מנהל</label>
-          <input
-            type="password"
-            value={authPw}
-            onChange={(e) => setAuthPw(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void reauth()
-            }}
-            placeholder="סיסמה"
-          />
-          {authErr && <div className="error-banner" style={{ marginTop: 12 }}>{authErr}</div>}
-          <button className="btn" onClick={() => void reauth()} disabled={authBusy || authPw === ''}>
-            {authBusy ? 'בודק…' : 'התחבר'}
-          </button>
-        </div>
-      </div>
-    )
-  }
 
   if (loading) return <div className="center-screen">טוען…</div>
 

@@ -33,8 +33,11 @@ npm run dev               # http://localhost:5173
 4. `supabase/migrations/0004_admin_employees.sql` — `is_active` + RPCs לניהול עובדים.
 5. `supabase/migrations/0005_passwords.sql` — סיסמאות עם hash (bcrypt), מדיניות סיסמה, נעילה אחרי כשלים, ולוג כניסות.
 6. `supabase/migrations/0006_admin_sessions.sql` — session tokens למנהל (12ש'), step-up לפעולות רגישות, ותיקון תצוגת זמן הנעילה.
+7. `supabase/migrations/0007_fix_admin_login.sql` — תיקון באג ambiguity ב-admin_login.
+8. `supabase/migrations/0008_unified_sessions.sql` — session לכל העובדים, ניתוק מיידי בהשבתה, session שמתפוגג ברקע.
+9. `supabase/migrations/0009_tasks_rpcs.sql` — סגירת RLS על tasks; כל הגישה דרך RPCs מאובטחים.
 
-כל הקבצים idempotent (אפשר להריץ שוב).
+כל הקבצים idempotent (אפשר להריץ שוב), והרצה **לפי הסדר**.
 
 ### בדיקה מהירה אחרי המיגרציה
 

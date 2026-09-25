@@ -11,7 +11,7 @@ import LoginAttempts from './screens/LoginAttempts'
 
 function Shell() {
   const { session, logout } = useAuth()
-  const { live, error } = useData()
+  const { error } = useData()
   const [tab, setTab] = useState<Tab>('tasks')
 
   if (!session) return <Login />
@@ -26,7 +26,6 @@ function Shell() {
         <header className="app-header">
           <h1>OPS Dashboard</h1>
           <div className="who">
-            <span className={`live-dot ${live ? 'on' : ''}`} title={live ? 'מחובר בזמן אמת' : 'לא מחובר'} />
             <span className={`role-badge role-${session.role}`}>
               {session.role === 'admin' ? 'מנהל' : 'מפעיל'}
             </span>

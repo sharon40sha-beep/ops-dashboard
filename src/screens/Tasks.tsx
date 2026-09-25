@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { supabase } from '../utils/supabase'
-import { auditLine, siteKindHe } from '../lib/ops'
-import type { ChecklistItem, Site, Task, TaskActual } from '../types'
+import { siteKindHe } from '../lib/ops'
+import type { ChecklistItem, Site, Task } from '../types'
 import Toast from '../components/Toast'
 
 function SiteLabel({ id, sitesById }: { id: string; sitesById: Map<string, Site> }) {
@@ -128,6 +128,7 @@ function TaskDetail({
   onSaved: (msg?: string) => void
   onCompleted: () => void
 }) {
+  const { token, logout } = useAuth()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
@@ -140,63 +141,58 @@ function TaskDetail({
   const deviated = vehicle.trim() !== task.vehicle.trim() || route.trim() !== task.route.trim()
   const allChecked = task.checklist.length > 0 && task.checklist.every((c) => c.checked)
 
-  async function patch(fields: Partial<Task>, doneMsg?: string) {
-    setErr('')
-    setBusy(true)
-    const { error } = await supabase.from('tasks').update(fields).eq('id', task.id)
-    setBusy(false)
-    if (error) {
-      setErr(error.message)
-      return false
+  function onRpcError(message: string) {
+    if (message.includes('session')) {
+      logout() // expired/invalid session -> back to login
+      return
     }
-    onSaved(doneMsg)
-    return true
+    setErr(translateTaskErr(message))
   }
 
+  // checklist edits go through the owner-checked RPC (tasks table is closed)
   async function toggle(idx: number) {
+    if (!token) return
     const checklist: ChecklistItem[] = task.checklist.map((c, i) =>
       i === idx ? { ...c, checked: !c.checked } : c,
     )
-    await patch({ checklist })
+    setErr('')
+    setBusy(true)
+    const { error } = await supabase.rpc('update_task_checklist', {
+      session_token: token,
+      task_id: task.id,
+      p_checklist: checklist,
+    })
+    setBusy(false)
+    if (error) return onRpcError(error.message)
+    onSaved()
   }
 
   async function start() {
-    await patch(
-      { status: 'active', audit_log: [...task.audit_log, auditLine('Task started')] },
-      'המשימה הופעלה',
-    )
+    if (!token) return
+    setErr('')
+    setBusy(true)
+    const { error } = await supabase.rpc('start_task', { session_token: token, task_id: task.id })
+    setBusy(false)
+    if (error) return onRpcError(error.message)
+    onSaved('המשימה הופעלה')
   }
 
   async function complete() {
+    if (!token) return
     if (deviated && reason.trim() === '') {
       setErr('זוהתה סטייה מהמתוכנן — חובה למלא סיבה לפני שמירה.')
       return
     }
-    const actual: TaskActual = {
-      vehicle: vehicle.trim(),
-      route: route.trim(),
-      completed_at: new Date().toISOString(),
-      deviated,
-      reason: deviated ? reason.trim() : '',
-    }
     setErr('')
     setBusy(true)
-    const { error } = await supabase
-      .from('tasks')
-      .update({
-        status: 'completed',
-        actual,
-        audit_log: [
-          ...task.audit_log,
-          auditLine(deviated ? 'Task completed (deviation logged)' : 'Task completed'),
-        ],
-      })
-      .eq('id', task.id)
+    // server recomputes deviation + completed_at from the planned values
+    const { error } = await supabase.rpc('complete_task', {
+      session_token: token,
+      task_id: task.id,
+      p_actual: { vehicle: vehicle.trim(), route: route.trim(), reason: reason.trim() },
+    })
     setBusy(false)
-    if (error) {
-      setErr(error.message)
-      return
-    }
+    if (error) return onRpcError(error.message)
     onCompleted()
   }
 
@@ -320,4 +316,13 @@ function TaskDetail({
       )}
     </div>
   )
+}
+
+function translateTaskErr(msg: string): string {
+  if (msg.includes('checklist incomplete')) return 'יש לסמן את כל הסעיפים לפני התחלה'
+  if (msg.includes('deviation reason')) return 'חובה למלא סיבת סטייה'
+  if (msg.includes('not your task')) return 'אין לך הרשאה למשימה זו'
+  if (msg.includes('not active')) return 'המשימה אינה פעילה'
+  if (msg.includes('not found')) return 'המשימה לא נמצאה'
+  return msg
 }

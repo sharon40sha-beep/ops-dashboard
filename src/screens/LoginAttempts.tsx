@@ -5,78 +5,31 @@ import { fmtDateTime, loginReasonHe } from '../lib/ops'
 import type { LoginAttempt } from '../types'
 
 export default function LoginAttempts() {
-  const { adminToken, setAdminToken } = useAuth()
+  const { token, logout } = useAuth()
   const [rows, setRows] = useState<LoginAttempt[]>([])
   const [loading, setLoading] = useState(true)
 
-  const [needAuth, setNeedAuth] = useState(false)
-  const [authPw, setAuthPw] = useState('')
-  const [authErr, setAuthErr] = useState('')
-  const [authBusy, setAuthBusy] = useState(false)
-
   const load = useCallback(async () => {
-    if (!adminToken) {
-      setNeedAuth(true)
-      setLoading(false)
+    if (!token) {
+      logout()
       return
     }
     setLoading(true)
     const { data, error } = await supabase.rpc('admin_list_login_attempts', {
-      session_token: adminToken,
+      session_token: token,
       limit_count: 100,
     })
     setLoading(false)
     if (error) {
-      setAdminToken(null)
-      setNeedAuth(true)
+      logout()
       return
     }
     setRows((data as LoginAttempt[]) ?? [])
-    setNeedAuth(false)
-  }, [adminToken, setAdminToken])
+  }, [token, logout])
 
   useEffect(() => {
     void load()
   }, [load])
-
-  async function reauth() {
-    setAuthErr('')
-    setAuthBusy(true)
-    const { data } = await supabase.rpc('admin_login', { pin: authPw })
-    setAuthBusy(false)
-    const token = (Array.isArray(data) ? data[0]?.token : undefined) as string | undefined
-    if (!token) {
-      setAuthErr('סיסמה שגויה או שאינה שייכת למנהל פעיל')
-      return
-    }
-    setAuthPw('')
-    setAdminToken(token)
-  }
-
-  if (needAuth) {
-    return (
-      <div>
-        <div className="card">
-          <h2>לוג כניסות — אימות מנהל</h2>
-          <p className="muted">פג תוקף החיבור או שאינך מחובר כמנהל. הזן/י את סיסמתך.</p>
-          <label>סיסמת מנהל</label>
-          <input
-            type="password"
-            value={authPw}
-            onChange={(e) => setAuthPw(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void reauth()
-            }}
-            placeholder="סיסמה"
-          />
-          {authErr && <div className="error-banner" style={{ marginTop: 12 }}>{authErr}</div>}
-          <button className="btn" onClick={() => void reauth()} disabled={authBusy || authPw === ''}>
-            {authBusy ? 'בודק…' : 'התחבר'}
-          </button>
-        </div>
-      </div>
-    )
-  }
 
   if (loading) return <div className="center-screen">טוען…</div>
 

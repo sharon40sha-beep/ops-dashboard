@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react'
-import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { fmtDateTime, siteKindHe } from '../lib/ops'
 import type { Task } from '../types'
 
 export default function History() {
-  const { session } = useAuth()
-  const { tasks, sitesById, employees } = useData()
+  // history is already scoped per-user by the list_task_history RPC.
+  const { history: completed, sitesById, employees } = useData()
   const [openLog, setOpenLog] = useState<string | null>(null)
 
   const nameById = useMemo(() => {
@@ -14,16 +13,6 @@ export default function History() {
     employees.forEach((e) => m.set(e.id, e.name))
     return m
   }, [employees])
-
-  const completed = useMemo(
-    () =>
-      tasks.filter((t) => {
-        if (t.status !== 'completed') return false
-        if (session?.role === 'operator') return t.worker_id === session.employeeId
-        return true
-      }),
-    [tasks, session],
-  )
 
   function siteText(id: string): string {
     const kind = sitesById.get(id)?.kind
