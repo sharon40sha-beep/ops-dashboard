@@ -7,9 +7,10 @@ import type { SiteKind } from '../types'
 import Toast from '../components/Toast'
 
 type Section = 'assets' | 'sites' | 'routes' | 'vehicles'
-interface AAsset { id: string; home_site_id: string; is_active: boolean }
+interface AAsset { id: string; home_site_id: string; is_active: boolean; checklist_template_id: string | null }
 interface ASite { id: string; kind: SiteKind; is_active: boolean }
 interface ACode { id: string; is_active: boolean }
+interface ATemplate { id: string; name: string; is_active: boolean }
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'assets', label: 'מוצרים' },
@@ -26,6 +27,7 @@ export default function Entities() {
   const [sites, setSites] = useState<ASite[]>([])
   const [routes, setRoutes] = useState<ACode[]>([])
   const [vehicles, setVehicles] = useState<ACode[]>([])
+  const [templates, setTemplates] = useState<ATemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [toast, setToast] = useState('')
@@ -34,6 +36,7 @@ export default function Entities() {
   const [nId, setNId] = useState('')
   const [nHome, setNHome] = useState('')
   const [nKind, setNKind] = useState<SiteKind>('warehouse')
+  const [nTpl, setNTpl] = useState('')
 
   const guard = (message: string): boolean => {
     if (message.includes('session')) {
@@ -47,11 +50,12 @@ export default function Entities() {
   const load = useCallback(async () => {
     if (!token) return logout()
     setLoading(true)
-    const [a, s, r, v] = await Promise.all([
+    const [a, s, r, v, tp] = await Promise.all([
       supabase.rpc('admin_list_assets', { session_token: token }),
       supabase.rpc('admin_list_sites', { session_token: token }),
       supabase.rpc('admin_list_routes', { session_token: token }),
       supabase.rpc('admin_list_vehicles', { session_token: token }),
+      supabase.rpc('admin_list_templates', { session_token: token }),
     ])
     setLoading(false)
     if (a.error) return logout()
@@ -59,6 +63,7 @@ export default function Entities() {
     setSites((s.data as ASite[]) ?? [])
     setRoutes((r.data as ACode[]) ?? [])
     setVehicles((v.data as ACode[]) ?? [])
+    setTemplates((tp.data as ATemplate[]) ?? [])
   }, [token, logout])
 
   useEffect(() => {
@@ -75,6 +80,7 @@ export default function Entities() {
     setNId('')
     setNHome('')
     setNKind('warehouse')
+    setNTpl('')
     await load()
     void refreshReference() // pickers in create/log reflect the change
   }
@@ -85,7 +91,9 @@ export default function Entities() {
     setErr('')
     if (section === 'assets') {
       if (!nHome) return setErr('בחר מחסן-בית')
-      const { error } = await supabase.rpc('admin_add_asset', { session_token: token, id: nId.trim(), home_site_id: nHome })
+      const { error } = await supabase.rpc('admin_add_asset', {
+        session_token: token, id: nId.trim(), home_site_id: nHome, checklist_template_id: nTpl || null,
+      })
       return after(error, 'נוסף')
     }
     if (section === 'sites') {
@@ -105,6 +113,7 @@ export default function Entities() {
     if (!token) return
     const { error } = await supabase.rpc('admin_update_asset', {
       session_token: token, id: a.id, home_site_id: a.home_site_id, is_active: a.is_active,
+      checklist_template_id: a.checklist_template_id,
     })
     return after(error, 'נשמר')
   }
@@ -147,6 +156,11 @@ export default function Entities() {
               <option value="">— בחר אתר —</option>
               {sites.map((s) => <option key={s.id} value={s.id}>{s.id} · {siteKindHe(s.kind)}</option>)}
             </select>
+            <label>תבנית צ׳קליסט</label>
+            <select value={nTpl} onChange={(e) => setNTpl(e.target.value)}>
+              <option value="">— ללא (צ׳קליסט ריק) —</option>
+              {templates.filter((t) => t.is_active).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
           </>
         )}
         {section === 'sites' && (
@@ -177,10 +191,15 @@ export default function Entities() {
                   <span>פעיל</span>
                 </label>
               </div>
-              <div className="emp-row-actions">
+              <div className="emp-row-actions" style={{ flexWrap: 'wrap' }}>
                 <select value={a.home_site_id}
                         onChange={(e) => setAssets((rs) => rs.map((x) => x.id === a.id ? { ...x, home_site_id: e.target.value } : x))}>
                   {sites.map((s) => <option key={s.id} value={s.id}>{s.id}</option>)}
+                </select>
+                <select value={a.checklist_template_id ?? ''}
+                        onChange={(e) => setAssets((rs) => rs.map((x) => x.id === a.id ? { ...x, checklist_template_id: e.target.value || null } : x))}>
+                  <option value="">— ללא תבנית —</option>
+                  {templates.filter((t) => t.is_active || t.id === a.checklist_template_id).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
                 <button className="btn sm" onClick={() => void saveAsset(a)}>שמור</button>
               </div>

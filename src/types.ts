@@ -42,6 +42,46 @@ export interface Asset {
   id: string // 'A1'..'A6'
   home_site_id: string
   is_active?: boolean
+  checklist_template_id?: string | null
+}
+
+/** A managed checklist template (one per asset). */
+export interface ChecklistTemplate {
+  id: string
+  name: string
+  is_active: boolean
+}
+
+/** One asset inside a trip, with its own copied checklist. */
+export interface TripItem {
+  id: string
+  trip_id: string
+  asset_id: string
+  checklist: ChecklistItem[]
+  checklist_note: string | null
+}
+
+/** A trip = one real movement carrying one or more assets. */
+export interface Trip {
+  id: string
+  from_site_id: string
+  to_site_id: string
+  worker_id: string
+  vehicle_id: string | null
+  route_id: string | null
+  time_window: string
+  status: TaskStatus
+  return_of_trip_id: string | null
+  actual: TaskActual | null
+  audit_log: string[]
+  started_at: string | null
+  created_at: string
+  items: TripItem[]
+}
+
+export interface LinkableTrip {
+  id: string
+  label: string
 }
 
 export interface Route {

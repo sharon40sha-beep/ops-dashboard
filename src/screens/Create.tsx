@@ -1,15 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { supabase } from '../utils/supabase'
 import { DEFAULT_TO_SITE, siteKindHe } from '../lib/ops'
+import type { LinkableTrip } from '../types'
 import Toast from '../components/Toast'
 
 export default function Create() {
   const { session, token, logout } = useAuth()
   const { assets, sites, sitesById, routes, vehicles, employees, refresh } = useData()
 
-  const sortedAssets = useMemo(
+  const activeAssets = useMemo(
     () => assets.filter((a) => a.is_active !== false).sort((a, b) => (a.id < b.id ? -1 : 1)),
     [assets],
   )
@@ -20,49 +21,57 @@ export default function Create() {
   const activeRoutes = useMemo(() => routes.filter((r) => r.is_active), [routes])
   const activeVehicles = useMemo(() => vehicles.filter((v) => v.is_active), [vehicles])
 
-  const [assetId, setAssetId] = useState('')
+  const [picked, setPicked] = useState<Set<string>>(new Set())
   const [fromSite, setFromSite] = useState('')
   const [toSite, setToSite] = useState('')
   const [workerId, setWorkerId] = useState('')
   const [vehicle, setVehicle] = useState('')
   const [route, setRoute] = useState('')
   const [timeWindow, setTimeWindow] = useState('')
+  const [isReturn, setIsReturn] = useState(false)
+  const [returnOf, setReturnOf] = useState('')
+  const [linkable, setLinkable] = useState<LinkableTrip[]>([])
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const [toast, setToast] = useState('')
 
-  // Effective asset defaults to the first one; "from" auto-fills from its home
-  // warehouse unless the admin picked one manually.
-  const activeAsset = assetId || sortedAssets[0]?.id || ''
-  const homeSite = sortedAssets.find((a) => a.id === activeAsset)?.home_site_id ?? ''
-  const effectiveFrom = fromSite || homeSite
   const effectiveTo = toSite || (sitesById.has(DEFAULT_TO_SITE) ? DEFAULT_TO_SITE : '')
 
-  function onPickAsset(id: string) {
-    setAssetId(id)
-    // Reset "from" so it re-derives from the newly chosen asset's home warehouse.
-    setFromSite('')
-    setErr('')
+  useEffect(() => {
+    if (!token) return
+    void supabase.rpc('admin_list_linkable_trips', { session_token: token }).then(({ data }) => {
+      setLinkable((data as LinkableTrip[]) ?? [])
+    })
+  }, [token])
+
+  function toggleAsset(id: string) {
+    setPicked((s) => {
+      const n = new Set(s)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
   }
 
   async function submit() {
     setErr('')
-    if (!activeAsset || !effectiveFrom || !effectiveTo) return setErr('יש לבחור מוצר, מאתר ולאתר')
+    if (picked.size === 0) return setErr('יש לבחור לפחות מוצר אחד')
+    if (!fromSite || !effectiveTo) return setErr('יש לבחור מאתר ולאתר')
     if (!workerId) return setErr('יש לבחור עובד מבצע')
+    if (isReturn && !returnOf) return setErr('בחר/י את נסיעת ההלוך המקושרת')
     if (!session || !token) return
 
     setSaving(true)
-    // tasks table is closed — create through the admin-only RPC (server sets the
-    // default checklist + initial audit log).
-    const { error } = await supabase.rpc('create_task', {
+    const { error } = await supabase.rpc('create_trip', {
       session_token: token,
-      asset_id: activeAsset,
-      from_site_id: effectiveFrom,
+      from_site_id: fromSite,
       to_site_id: effectiveTo,
       worker_id: workerId,
-      vehicle: vehicle.trim(),
-      route: route.trim(),
+      vehicle_id: vehicle,
+      route_id: route,
       time_window: timeWindow.trim(),
+      asset_ids: [...picked],
+      return_of_trip_id: isReturn ? returnOf : null,
     })
     setSaving(false)
     if (error) {
@@ -70,49 +79,48 @@ export default function Create() {
       setErr(error.message)
       return
     }
-    // reset (keep the chosen asset for quick repeat)
-    setWorkerId('')
+    setPicked(new Set())
     setVehicle('')
     setRoute('')
     setTimeWindow('')
-    setToast(`נוצרה משימה למוצר ${activeAsset} (${effectiveFrom} ← ${effectiveTo})`)
+    setIsReturn(false)
+    setReturnOf('')
+    setToast(`נוצרה נסיעה (${fromSite} ← ${effectiveTo})`)
     void refresh()
   }
 
   return (
     <div>
       <div className="card">
-        <h2>יצירת משימה</h2>
+        <h2>יצירת נסיעה</h2>
 
-        <label>מוצר</label>
-        <select value={activeAsset} onChange={(e) => onPickAsset(e.target.value)}>
-          {sortedAssets.length === 0 && <option value="">אין מוצרים — הרץ/י seed</option>}
-          {sortedAssets.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.id} — מחסן-בית {a.home_site_id}
-            </option>
+        <label>מוצרים בנסיעה (הגרלה משותפת אחת)</label>
+        <div className="asset-pick">
+          {activeAssets.length === 0 && <p className="muted">אין מוצרים פעילים</p>}
+          {activeAssets.map((a) => (
+            <button
+              key={a.id}
+              className={`pick-chip ${picked.has(a.id) ? 'on' : ''}`}
+              onClick={() => toggleAsset(a.id)}
+              type="button"
+            >
+              {a.id}
+            </button>
           ))}
-        </select>
+        </div>
 
         <div style={{ display: 'flex', gap: 12 }}>
           <div style={{ flex: 1 }}>
             <label>מאתר</label>
-            <select value={effectiveFrom} onChange={(e) => setFromSite(e.target.value)}>
-              {sortedSites.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.id} · {siteKindHe(s.kind)}
-                </option>
-              ))}
+            <select value={fromSite} onChange={(e) => setFromSite(e.target.value)}>
+              <option value="">— בחר —</option>
+              {sortedSites.map((s) => <option key={s.id} value={s.id}>{s.id} · {siteKindHe(s.kind)}</option>)}
             </select>
           </div>
           <div style={{ flex: 1 }}>
             <label>לאתר</label>
             <select value={effectiveTo} onChange={(e) => setToSite(e.target.value)}>
-              {sortedSites.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.id} · {siteKindHe(s.kind)}
-                </option>
-              ))}
+              {sortedSites.map((s) => <option key={s.id} value={s.id}>{s.id} · {siteKindHe(s.kind)}</option>)}
             </select>
           </div>
         </div>
@@ -120,31 +128,22 @@ export default function Create() {
         <label>עובד מבצע</label>
         <select value={workerId} onChange={(e) => setWorkerId(e.target.value)}>
           <option value="">— בחר עובד —</option>
-          {employees.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.name}
-              {w.role === 'admin' ? ' (מנהל)' : ''}
-            </option>
-          ))}
+          {employees.map((w) => <option key={w.id} value={w.id}>{w.name}{w.role === 'admin' ? ' (מנהל)' : ''}</option>)}
         </select>
 
         <div style={{ display: 'flex', gap: 12 }}>
           <div style={{ flex: 1 }}>
-            <label>קוד רכב</label>
+            <label>רכב</label>
             <select value={vehicle} onChange={(e) => setVehicle(e.target.value)}>
               <option value="">— בחר רכב —</option>
-              {activeVehicles.map((v) => (
-                <option key={v.id} value={v.id}>{v.id}</option>
-              ))}
+              {activeVehicles.map((v) => <option key={v.id} value={v.id}>{v.id}</option>)}
             </select>
           </div>
           <div style={{ flex: 1 }}>
             <label>ציר</label>
             <select value={route} onChange={(e) => setRoute(e.target.value)}>
               <option value="">— בחר ציר —</option>
-              {activeRoutes.map((r) => (
-                <option key={r.id} value={r.id}>{r.id}</option>
-              ))}
+              {activeRoutes.map((r) => <option key={r.id} value={r.id}>{r.id}</option>)}
             </select>
           </div>
         </div>
@@ -152,10 +151,21 @@ export default function Create() {
         <label>חלון זמן</label>
         <input type="text" value={timeWindow} placeholder="לדוגמה 08:00–09:30" onChange={(e) => setTimeWindow(e.target.value)} />
 
+        <label className="inline-check" style={{ marginTop: 14 }}>
+          <input type="checkbox" checked={isReturn} onChange={(e) => setIsReturn(e.target.checked)} />
+          <span>זו נסיעת חזרה של נסיעה קיימת</span>
+        </label>
+        {isReturn && (
+          <select value={returnOf} onChange={(e) => setReturnOf(e.target.value)}>
+            <option value="">— בחר נסיעת הלוך —</option>
+            {linkable.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+          </select>
+        )}
+
         {err && <div className="error-banner" style={{ marginTop: 12 }}>{err}</div>}
 
         <button className="btn" onClick={() => void submit()} disabled={saving}>
-          {saving ? 'יוצר…' : 'צור משימה'}
+          {saving ? 'יוצר…' : 'צור נסיעה'}
         </button>
       </div>
 
