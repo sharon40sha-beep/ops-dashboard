@@ -888,3 +888,35 @@ textarea:focus {
   flex-direction: column;
   gap: 4px;
 }
+
+/* ---------- Trip / duty distinction ---------- */
+.kind-dot {
+  margin-inline-end: 6px;
+}
+.kind-tag-lg {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* ---------- Joint movement table ---------- */
+.joint-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 6px 10px;
+  margin-top: 8px;
+  align-items: center;
+}
+.joint-head {
+  font-size: 12px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+.joint-row {
+  display: contents;
+}
+.joint-row > div {
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}

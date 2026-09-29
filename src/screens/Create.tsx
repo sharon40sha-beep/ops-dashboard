@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { supabase } from '../utils/supabase'
-import { DEFAULT_TO_SITE, siteKindHe } from '../lib/ops'
-import type { LinkableTrip } from '../types'
+import { DEFAULT_TO_SITE, localToIso, siteKindHe } from '../lib/ops'
+import type { DutyType, LinkableTrip } from '../types'
 import Toast from '../components/Toast'
 
 export default function Create() {
@@ -35,6 +35,15 @@ export default function Create() {
   const [err, setErr] = useState('')
   const [toast, setToast] = useState('')
 
+  // trip vs shift
+  const [mode, setMode] = useState<'trip' | 'duty'>('trip')
+  const [dutyTypes, setDutyTypes] = useState<DutyType[]>([])
+  const [dSite, setDSite] = useState('')
+  const [dType, setDType] = useState('')
+  const [dWorker, setDWorker] = useState('')
+  const [dStart, setDStart] = useState('')
+  const [dEnd, setDEnd] = useState('')
+
   const effectiveTo = toSite || (sitesById.has(DEFAULT_TO_SITE) ? DEFAULT_TO_SITE : '')
 
   useEffect(() => {
@@ -42,7 +51,35 @@ export default function Create() {
     void supabase.rpc('admin_list_linkable_trips', { session_token: token }).then(({ data }) => {
       setLinkable((data as LinkableTrip[]) ?? [])
     })
+    void supabase.rpc('admin_list_duty_types', { session_token: token }).then(({ data }) => {
+      setDutyTypes((data as DutyType[]) ?? [])
+    })
   }, [token])
+
+  async function submitDuty() {
+    setErr('')
+    if (!dSite || !dType || !dWorker) return setErr('יש לבחור אתר, סוג משמרת ועובד')
+    if (!dStart || !dEnd) return setErr('יש למלא זמן התחלה וסיום')
+    if (!token) return
+    setSaving(true)
+    const { error } = await supabase.rpc('create_duty_shift', {
+      session_token: token,
+      site_id: dSite,
+      worker_id: dWorker,
+      duty_type_id: dType,
+      start_time: localToIso(dStart),
+      end_time: localToIso(dEnd),
+    })
+    setSaving(false)
+    if (error) {
+      if (error.message.includes('session')) return logout()
+      setErr(error.message)
+      return
+    }
+    setDSite(''); setDType(''); setDWorker(''); setDStart(''); setDEnd('')
+    setToast('נוצרה משמרת')
+    void refresh()
+  }
 
   function toggleAsset(id: string) {
     setPicked((s) => {
@@ -91,6 +128,45 @@ export default function Create() {
 
   return (
     <div>
+      <div className="segmented" style={{ marginBottom: 14 }}>
+        <button className={mode === 'trip' ? 'active' : ''} onClick={() => { setMode('trip'); setErr('') }}>🚚 נסיעה</button>
+        <button className={mode === 'duty' ? 'active' : ''} onClick={() => { setMode('duty'); setErr('') }}>🛡️ משמרת</button>
+      </div>
+
+      {mode === 'duty' && (
+        <div className="card">
+          <h2>יצירת משמרת</h2>
+          <label>אתר</label>
+          <select value={dSite} onChange={(e) => setDSite(e.target.value)}>
+            <option value="">— בחר —</option>
+            {sortedSites.map((s) => <option key={s.id} value={s.id}>{s.id} · {siteKindHe(s.kind)}</option>)}
+          </select>
+          <label>סוג משמרת</label>
+          <select value={dType} onChange={(e) => setDType(e.target.value)}>
+            <option value="">— בחר —</option>
+            {dutyTypes.filter((t) => t.is_active).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+          <label>עובד</label>
+          <select value={dWorker} onChange={(e) => setDWorker(e.target.value)}>
+            <option value="">— בחר עובד —</option>
+            {employees.map((w) => <option key={w.id} value={w.id}>{w.name}{w.role === 'admin' ? ' (מנהל)' : ''}</option>)}
+          </select>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <label>התחלה</label>
+              <input type="datetime-local" value={dStart} onChange={(e) => setDStart(e.target.value)} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label>סיום</label>
+              <input type="datetime-local" value={dEnd} onChange={(e) => setDEnd(e.target.value)} />
+            </div>
+          </div>
+          {err && <div className="error-banner" style={{ marginTop: 12 }}>{err}</div>}
+          <button className="btn" onClick={() => void submitDuty()} disabled={saving}>{saving ? 'יוצר…' : 'צור משמרת'}</button>
+        </div>
+      )}
+
+      {mode === 'trip' && (
       <div className="card">
         <h2>יצירת נסיעה</h2>
 
@@ -168,6 +244,7 @@ export default function Create() {
           {saving ? 'יוצר…' : 'צור נסיעה'}
         </button>
       </div>
+      )}
 
       {toast && <Toast message={toast} onDone={() => setToast('')} />}
     </div>

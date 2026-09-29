@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { supabase } from '../utils/supabase'
-import { siteKindHe } from '../lib/ops'
+import { fmtDateTime, siteKindHe } from '../lib/ops'
 import type { ChecklistItem, Site, Trip, TripItem } from '../types'
 import Toast from '../components/Toast'
+import DutyDetail from './DutyDetail'
 
 function SiteLabel({ id, sitesById }: { id: string; sitesById: Map<string, Site> }) {
   const kind = sitesById.get(id)?.kind
@@ -23,8 +24,8 @@ const STATUS_HE: Record<Trip['status'], string> = {
 }
 
 export default function Tasks() {
-  const { trips, sitesById, employees, loading, refresh } = useData()
-  const [openId, setOpenId] = useState<string | null>(null)
+  const { trips, duties, sitesById, employees, loading, refresh } = useData()
+  const [open, setOpen] = useState<{ kind: 'trip' | 'duty'; id: string } | null>(null)
   const [toast, setToast] = useState('')
 
   const nameById = useMemo(() => {
@@ -33,27 +34,42 @@ export default function Tasks() {
     return m
   }, [employees])
 
-  const open = openId ? trips.find((t) => t.id === openId) : null
+  // trips + duty shifts merged into one time-sorted feed
+  const rows = useMemo(() => {
+    const t = trips.map((x) => ({ kind: 'trip' as const, id: x.id, created_at: x.created_at, trip: x }))
+    const d = duties.map((x) => ({ kind: 'duty' as const, id: x.id, created_at: x.created_at, duty: x }))
+    return [...t, ...d].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+  }, [trips, duties])
 
-  if (loading && trips.length === 0) return <div className="center-screen">טוען…</div>
+  const openTrip = open?.kind === 'trip' ? trips.find((t) => t.id === open.id) : null
+  const openDuty = open?.kind === 'duty' ? duties.find((d) => d.id === open.id) : null
 
-  if (open && open.status !== 'completed') {
+  if (loading && rows.length === 0) return <div className="center-screen">טוען…</div>
+
+  if (openTrip && openTrip.status !== 'completed') {
     return (
       <>
         <TripDetail
-          trip={open}
+          trip={openTrip}
           sitesById={sitesById}
-          workerName={nameById.get(open.worker_id)}
-          onBack={() => setOpenId(null)}
-          onSaved={(msg) => {
-            void refresh()
-            if (msg) setToast(msg)
-          }}
-          onCompleted={() => {
-            setOpenId(null)
-            void refresh()
-            setToast('הנסיעה הושלמה')
-          }}
+          workerName={nameById.get(openTrip.worker_id)}
+          onBack={() => setOpen(null)}
+          onSaved={(msg) => { void refresh(); if (msg) setToast(msg) }}
+          onCompleted={() => { setOpen(null); void refresh(); setToast('הנסיעה הושלמה') }}
+        />
+        {toast && <Toast message={toast} onDone={() => setToast('')} />}
+      </>
+    )
+  }
+
+  if (openDuty && openDuty.status !== 'completed') {
+    return (
+      <>
+        <DutyDetail
+          duty={openDuty}
+          onBack={() => setOpen(null)}
+          onSaved={(msg) => { void refresh(); if (msg) setToast(msg) }}
+          onCompleted={() => { setOpen(null); void refresh(); setToast('המשמרת הושלמה') }}
         />
         {toast && <Toast message={toast} onDone={() => setToast('')} />}
       </>
@@ -63,31 +79,47 @@ export default function Tasks() {
   return (
     <div>
       <div className="card">
-        <h2>נסיעות פעילות ({trips.length})</h2>
-        {trips.length === 0 && <p className="muted">אין נסיעות פעילות.</p>}
+        <h2>משימות פעילות ({rows.length})</h2>
+        {rows.length === 0 && <p className="muted">אין משימות פעילות.</p>}
         <div className="chips" style={{ flexDirection: 'column' }}>
-          {trips.map((t) => (
-            <button key={t.id} className="task-card" onClick={() => setOpenId(t.id)}>
-              <div className="task-card-top">
-                <span className="trip-assets">
-                  {t.items.map((it) => (
-                    <span className="code" key={it.id}>{it.asset_id}</span>
-                  ))}
-                </span>
-                <span className={`status-pill status-${t.status}`}>{STATUS_HE[t.status]}</span>
-              </div>
-              <div className="route-line">
-                <SiteLabel id={t.from_site_id} sitesById={sitesById} />
-                <span className="arrow">←</span>
-                <SiteLabel id={t.to_site_id} sitesById={sitesById} />
-              </div>
-              <div className="task-card-meta">
-                {t.route_id && <span>ציר: <strong>{t.route_id}</strong></span>}
-                {t.vehicle_id && <span>רכב: <span className="code sm">{t.vehicle_id}</span></span>}
-                {t.time_window && <span>חלון: {t.time_window}</span>}
-              </div>
-            </button>
-          ))}
+          {rows.map((r) =>
+            r.kind === 'trip' ? (
+              <button key={`t-${r.id}`} className="task-card" onClick={() => setOpen({ kind: 'trip', id: r.id })}>
+                <div className="task-card-top">
+                  <span className="trip-assets">
+                    <span className="kind-dot trip">🚚</span>
+                    {r.trip.items.map((it) => <span className="code" key={it.id}>{it.asset_id}</span>)}
+                  </span>
+                  <span className={`status-pill status-${r.trip.status}`}>{STATUS_HE[r.trip.status]}</span>
+                </div>
+                <div className="route-line">
+                  <SiteLabel id={r.trip.from_site_id} sitesById={sitesById} />
+                  <span className="arrow">←</span>
+                  <SiteLabel id={r.trip.to_site_id} sitesById={sitesById} />
+                </div>
+                <div className="task-card-meta">
+                  {r.trip.route_id && <span>ציר: <strong>{r.trip.route_id}</strong></span>}
+                  {r.trip.vehicle_id && <span>רכב: <span className="code sm">{r.trip.vehicle_id}</span></span>}
+                  {r.trip.time_window && <span>חלון: {r.trip.time_window}</span>}
+                </div>
+              </button>
+            ) : (
+              <button key={`d-${r.id}`} className="task-card" onClick={() => setOpen({ kind: 'duty', id: r.id })}>
+                <div className="task-card-top">
+                  <span className="trip-assets">
+                    <span className="kind-dot duty">🛡️</span>
+                    <strong>{r.duty.duty_type_label}</strong>
+                  </span>
+                  <span className={`status-pill status-${r.duty.status}`}>{STATUS_HE[r.duty.status]}</span>
+                </div>
+                <div className="route-line"><span className="code">{r.duty.site_id}</span></div>
+                <div className="task-card-meta">
+                  <span>מ־{fmtDateTime(r.duty.start_time)}</span>
+                  <span>עד {fmtDateTime(r.duty.end_time)}</span>
+                </div>
+              </button>
+            ),
+          )}
         </div>
       </div>
       {toast && <Toast message={toast} onDone={() => setToast('')} />}

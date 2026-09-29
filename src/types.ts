@@ -84,6 +84,56 @@ export interface LinkableTrip {
   label: string
 }
 
+// ---- duties (E) ----
+export interface DutyType {
+  id: string
+  label: string
+  checklist_template_id: string | null
+  is_active: boolean
+}
+
+export interface DutyActual {
+  actual_start: string | null
+  actual_end: string | null
+  anomaly_found: boolean
+  anomaly_notes: string
+  completed_at?: string
+}
+
+export interface DutyShift {
+  id: string
+  site_id: string
+  worker_id: string
+  duty_type_id: string
+  duty_type_label: string
+  start_time: string
+  end_time: string
+  status: TaskStatus
+  checklist: ChecklistItem[]
+  checklist_note: string | null
+  actual: DutyActual | null
+  audit_log: string[]
+  created_at: string
+}
+
+// ---- analytics (D) ----
+export interface JointPair {
+  a: string
+  b: string
+  joint: number
+  total_a: number
+  total_b: number
+  pct_a: number
+  pct_b: number
+}
+
+export interface DutySummary {
+  total: number
+  anomalies: number
+  by_type: { key: string; count: number }[]
+  by_worker: { key: string; count: number }[]
+}
+
 export interface Route {
   id: string
   is_active: boolean
