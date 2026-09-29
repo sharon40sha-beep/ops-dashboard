@@ -5,6 +5,7 @@ import { supabase } from '../utils/supabase'
 import { siteKindHe } from '../lib/ops'
 import type { SiteKind } from '../types'
 import Toast from '../components/Toast'
+import DeleteAction from '../components/DeleteAction'
 
 type Section = 'assets' | 'sites' | 'routes' | 'vehicles'
 interface AAsset { id: string; home_site_id: string; is_active: boolean; checklist_template_id: string | null }
@@ -202,6 +203,9 @@ export default function Entities() {
                   {templates.filter((t) => t.is_active || t.id === a.checklist_template_id).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
                 <button className="btn sm" onClick={() => void saveAsset(a)}>שמור</button>
+                <DeleteAction label={`מוצר ${a.id}`} small
+                  run={(reason, pin) => supabase.rpc('admin_delete_asset', { session_token: token, actor_pin: pin, id: a.id, reason })}
+                  onDone={() => { void load(); void refreshReference() }} />
               </div>
             </div>
           ))}
@@ -229,6 +233,9 @@ export default function Entities() {
                   <option value="other">מתקן</option>
                 </select>
                 <button className="btn sm" onClick={() => void saveSite(s)}>שמור</button>
+                <DeleteAction label={`אתר ${s.id}`} small
+                  run={(reason, pin) => supabase.rpc('admin_delete_site', { session_token: token, actor_pin: pin, id: s.id, reason })}
+                  onDone={() => { void load(); void refreshReference() }} />
               </div>
             </div>
           ))}
@@ -245,6 +252,9 @@ export default function Entities() {
                 <button className={`btn sm ${r.is_active ? 'ghost' : ''}`} onClick={() => void toggleCode('routes', r)}>
                   {r.is_active ? 'השבת' : 'הפעל'}
                 </button>
+                <DeleteAction label={`ציר ${r.id}`} small
+                  run={(reason, pin) => supabase.rpc('admin_delete_route', { session_token: token, actor_pin: pin, id: r.id, reason })}
+                  onDone={() => { void load(); void refreshReference() }} />
               </div>
             </div>
           ))}
@@ -261,6 +271,9 @@ export default function Entities() {
                 <button className={`btn sm ${v.is_active ? 'ghost' : ''}`} onClick={() => void toggleCode('vehicles', v)}>
                   {v.is_active ? 'השבת' : 'הפעל'}
                 </button>
+                <DeleteAction label={`רכב ${v.id}`} small
+                  run={(reason, pin) => supabase.rpc('admin_delete_vehicle', { session_token: token, actor_pin: pin, id: v.id, reason })}
+                  onDone={() => { void load(); void refreshReference() }} />
               </div>
             </div>
           ))}

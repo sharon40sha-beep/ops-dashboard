@@ -6,8 +6,9 @@ import Entities from './Entities'
 import Summary from './Summary'
 import DutyTypesAdmin from './DutyTypesAdmin'
 import DutySummary from './DutySummary'
+import DeletionLog from './DeletionLog'
 
-type Sub = 'menu' | 'employees' | 'attempts' | 'checklist' | 'entities' | 'summary' | 'dutytypes' | 'dutysummary'
+type Sub = 'menu' | 'employees' | 'attempts' | 'checklist' | 'entities' | 'summary' | 'dutytypes' | 'dutysummary' | 'deletions'
 
 const ITEMS: { id: Exclude<Sub, 'menu'>; label: string; icon: string; desc: string }[] = [
   { id: 'employees', label: 'עובדים', icon: '👤', desc: 'הוספה, סיסמאות, הרשאות, השבתה' },
@@ -17,6 +18,7 @@ const ITEMS: { id: Exclude<Sub, 'menu'>; label: string; icon: string; desc: stri
   { id: 'summary', label: 'לוח למידה', icon: '📊', desc: 'סיכום מוצר + תנועה משותפת' },
   { id: 'dutysummary', label: 'סיכום משמרות', icon: '📋', desc: 'ניתוח משמרות לפי אתר' },
   { id: 'attempts', label: 'לוג כניסות', icon: '🔐', desc: 'ניסיונות התחברות אחרונים' },
+  { id: 'deletions', label: 'יומן מחיקות', icon: '🗑️', desc: 'תיעוד קבוע של כל מחיקה' },
 ]
 
 export default function AdminHub() {
@@ -51,6 +53,7 @@ export default function AdminHub() {
       {sub === 'summary' && <Summary />}
       {sub === 'dutytypes' && <DutyTypesAdmin />}
       {sub === 'dutysummary' && <DutySummary />}
+      {sub === 'deletions' && <DeletionLog />}
     </div>
   )
 }

@@ -1,10 +1,15 @@
 import { useMemo, useState } from 'react'
+import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
+import { supabase } from '../utils/supabase'
 import { fmtDateTime, siteKindHe } from '../lib/ops'
+import DeleteAction from '../components/DeleteAction'
 import type { DutyShift, Trip } from '../types'
 
 export default function History() {
-  const { history, trips, dutyHistory, sitesById, employees } = useData()
+  const { session, token, logout } = useAuth()
+  const { history, trips, dutyHistory, sitesById, employees, refresh } = useData()
+  const isAdmin = session?.role === 'admin'
   const [openLog, setOpenLog] = useState<string | null>(null)
 
   const nameById = useMemo(() => {
@@ -13,7 +18,6 @@ export default function History() {
     return m
   }, [employees])
 
-  // trip labels + return-link maps
   const allTrips = useMemo(() => [...history, ...trips], [history, trips])
   const labelById = useMemo(() => {
     const m = new Map<string, string>()
@@ -37,16 +41,26 @@ export default function History() {
     return kind ? `${id} · ${siteKindHe(kind)}` : id
   }
 
+  async function setTripExcl(id: string, excluded: boolean, reason: string) {
+    if (!token) return
+    const { error } = await supabase.rpc('admin_set_trip_analysis_exclusion', { session_token: token, trip_id: id, excluded, reason })
+    if (error) { if (error.message.includes('session')) logout(); return }
+    void refresh()
+  }
+  async function setDutyExcl(id: string, excluded: boolean, reason: string) {
+    if (!token) return
+    const { error } = await supabase.rpc('admin_set_duty_analysis_exclusion', { session_token: token, duty_shift_id: id, excluded, reason })
+    if (error) { if (error.message.includes('session')) logout(); return }
+    void refresh()
+  }
+
   return (
     <div>
       <div className="card">
         <h2>היסטוריה ({rows.length})</h2>
         {rows.length === 0 && <p className="muted">אין רשומות שהושלמו.</p>}
       </div>
-
-      {rows.map((r) =>
-        r.kind === 'trip' ? renderTrip(r.trip) : renderDuty(r.duty),
-      )}
+      {rows.map((r) => (r.kind === 'trip' ? renderTrip(r.trip) : renderDuty(r.duty)))}
     </div>
   )
 
@@ -88,6 +102,18 @@ export default function History() {
             ))}
           </div>
         )}
+
+        {isAdmin && (
+          <div className="admin-row">
+            <AnalysisToggle excluded={!!t.excluded_from_analysis} reason={t.excluded_reason ?? null}
+              onSet={(ex, rs) => setTripExcl(t.id, ex, rs)} />
+            <DeleteAction label={`נסיעה ${t.items.map((i) => i.asset_id).join(',')}`} small
+              run={(reason, pin) => supabase.rpc('admin_delete_trip', { session_token: token, actor_pin: pin, trip_id: t.id, reason })}
+              onDone={() => void refresh()} />
+          </div>
+        )}
+        {!isAdmin && t.excluded_from_analysis && <div className="excl-tag">לא נכלל בניתוח</div>}
+
         <div className="hist-foot">
           <span className="muted">עובד: {nameById.get(t.worker_id) ?? 'לא ידוע'}</span>
           <button className="log-toggle" onClick={() => setOpenLog(logOpen ? null : t.id)}>
@@ -114,6 +140,18 @@ export default function History() {
         </div>
         {a?.anomaly_found && <div className="reason-box"><strong>חריג:</strong> {a.anomaly_notes || '—'}</div>}
         {d.checklist_note && <div className="notes-box"><div>דילוג: {d.checklist_note}</div></div>}
+
+        {isAdmin && (
+          <div className="admin-row">
+            <AnalysisToggle excluded={!!d.excluded_from_analysis} reason={d.excluded_reason ?? null}
+              onSet={(ex, rs) => setDutyExcl(d.id, ex, rs)} />
+            <DeleteAction label={`משמרת ${d.duty_type_label}`} small
+              run={(reason, pin) => supabase.rpc('admin_delete_duty_shift', { session_token: token, actor_pin: pin, duty_shift_id: d.id, reason })}
+              onDone={() => void refresh()} />
+          </div>
+        )}
+        {!isAdmin && d.excluded_from_analysis && <div className="excl-tag">לא נכלל בניתוח</div>}
+
         <div className="hist-foot">
           <span className="muted">עובד: {nameById.get(d.worker_id) ?? 'לא ידוע'}</span>
           <button className="log-toggle" onClick={() => setOpenLog(logOpen ? null : d.id)}>
@@ -124,4 +162,35 @@ export default function History() {
       </div>
     )
   }
+}
+
+function AnalysisToggle({
+  excluded, reason, onSet,
+}: {
+  excluded: boolean
+  reason: string | null
+  onSet: (excluded: boolean, reason: string) => Promise<void>
+}) {
+  const [openForm, setOpenForm] = useState(false)
+  const [r, setR] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  if (excluded) {
+    return (
+      <div className="excl-box">
+        <span className="excl-tag">לא נכלל בניתוח{reason ? `: ${reason}` : ''}</span>
+        <button className="btn sm ghost" disabled={busy} onClick={async () => { setBusy(true); await onSet(false, ''); setBusy(false) }}>כלול שוב</button>
+      </div>
+    )
+  }
+  if (!openForm) {
+    return <button className="btn sm ghost" onClick={() => setOpenForm(true)}>אל תכלול בניתוח</button>
+  }
+  return (
+    <div className="excl-form">
+      <input type="text" value={r} onChange={(e) => setR(e.target.value)} placeholder="סיבה" />
+      <button className="btn sm" disabled={busy || r.trim() === ''} onClick={async () => { setBusy(true); await onSet(true, r.trim()); setBusy(false); setOpenForm(false); setR('') }}>שמור</button>
+      <button className="btn sm ghost" onClick={() => setOpenForm(false)}>ביטול</button>
+    </div>
+  )
 }

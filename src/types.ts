@@ -76,6 +76,8 @@ export interface Trip {
   audit_log: string[]
   started_at: string | null
   created_at: string
+  excluded_from_analysis?: boolean
+  excluded_reason?: string | null
   items: TripItem[]
 }
 
@@ -114,6 +116,18 @@ export interface DutyShift {
   actual: DutyActual | null
   audit_log: string[]
   created_at: string
+  excluded_from_analysis?: boolean
+  excluded_reason?: string | null
+}
+
+export interface DeletionLogEntry {
+  id: string
+  entity_type: string
+  entity_id: string | null
+  deleted_by_name: string | null
+  deleted_at: string
+  reason: string | null
+  snapshot: Record<string, unknown> | null
 }
 
 // ---- analytics (D) ----

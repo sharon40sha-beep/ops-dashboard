@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../utils/supabase'
 import type { ChecklistTemplate, ChecklistTemplateItem } from '../types'
 import Toast from '../components/Toast'
+import DeleteAction from '../components/DeleteAction'
 
 export default function ChecklistAdmin() {
   const { token, logout } = useAuth()
@@ -143,6 +144,9 @@ export default function ChecklistAdmin() {
                 <button className="btn sm ghost" onClick={() => { patchItem(r.id, { is_active: !r.is_active }); void saveItem({ ...r, is_active: !r.is_active }) }}>
                   {r.is_active ? 'לארכיון' : 'שחזר'}
                 </button>
+                <DeleteAction label={`סעיף "${r.label}"`} small
+                  run={(reason, pin) => supabase.rpc('admin_delete_checklist_item', { session_token: token, actor_pin: pin, id: r.id, reason })}
+                  onDone={() => selected && void loadItems(selected.id)} />
                 <button className="btn sm" onClick={() => void saveItem(r)} style={{ marginInlineStart: 'auto' }}>שמור</button>
               </div>
             </div>
@@ -174,6 +178,9 @@ export default function ChecklistAdmin() {
                 {t.is_active ? 'לארכיון' : 'שחזר'}
               </button>
               <button className="btn sm" onClick={() => void saveTpl(t)}>שמור שם</button>
+              <DeleteAction label={`תבנית "${t.name}"`} small
+                run={(reason, pin) => supabase.rpc('admin_delete_checklist_template', { session_token: token, actor_pin: pin, id: t.id, reason })}
+                onDone={() => void loadTemplates()} />
               <button className="btn sm" onClick={() => setSelected(t)}>נהל סעיפים ›</button>
             </div>
           </div>

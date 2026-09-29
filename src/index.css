@@ -920,3 +920,79 @@ textarea:focus {
   padding: 6px 0;
   border-bottom: 1px solid var(--border);
 }
+
+/* ---------- Delete / exclusion (migration 0013) ---------- */
+.btn.danger {
+  background: var(--danger);
+  color: #14161c;
+}
+.btn.secondary.danger,
+.btn.ghost.danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+/* back-button + admin actions row on detail screens */
+.detail-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.detail-topbar .btn {
+  width: auto;
+}
+
+/* admin controls under a history card (exclude-from-analysis + delete) */
+.admin-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+.admin-row .btn {
+  width: auto;
+  margin-top: 0;
+}
+
+/* "excluded from analysis" tag + inline form */
+.excl-tag {
+  display: inline-block;
+  background: rgba(224, 108, 90, 0.14);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 10px;
+}
+.excl-box {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.excl-box .excl-tag {
+  margin-top: 0;
+}
+.excl-box .btn,
+.excl-form .btn {
+  width: auto;
+  margin-top: 0;
+}
+.excl-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.excl-form input {
+  flex: 1;
+  min-width: 140px;
+  margin: 0;
+}

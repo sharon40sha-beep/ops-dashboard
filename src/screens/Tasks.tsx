@@ -6,6 +6,7 @@ import { fmtDateTime, siteKindHe } from '../lib/ops'
 import type { ChecklistItem, Site, Trip, TripItem } from '../types'
 import Toast from '../components/Toast'
 import DutyDetail from './DutyDetail'
+import DeleteAction from '../components/DeleteAction'
 
 function SiteLabel({ id, sitesById }: { id: string; sitesById: Map<string, Site> }) {
   const kind = sitesById.get(id)?.kind
@@ -56,6 +57,7 @@ export default function Tasks() {
           onBack={() => setOpen(null)}
           onSaved={(msg) => { void refresh(); if (msg) setToast(msg) }}
           onCompleted={() => { setOpen(null); void refresh(); setToast('הנסיעה הושלמה') }}
+          onDeleted={() => { setOpen(null); void refresh(); setToast('נמחק') }}
         />
         {toast && <Toast message={toast} onDone={() => setToast('')} />}
       </>
@@ -70,6 +72,7 @@ export default function Tasks() {
           onBack={() => setOpen(null)}
           onSaved={(msg) => { void refresh(); if (msg) setToast(msg) }}
           onCompleted={() => { setOpen(null); void refresh(); setToast('המשמרת הושלמה') }}
+          onDeleted={() => { setOpen(null); void refresh(); setToast('נמחק') }}
         />
         {toast && <Toast message={toast} onDone={() => setToast('')} />}
       </>
@@ -138,15 +141,17 @@ function TripDetail({
   onBack,
   onSaved,
   onCompleted,
+  onDeleted,
 }: {
   trip: Trip
   sitesById: Map<string, Site>
   workerName?: string
   onBack: () => void
+  onDeleted: () => void
   onSaved: (msg?: string) => void
   onCompleted: () => void
 }) {
-  const { token, logout } = useAuth()
+  const { token, logout, session } = useAuth()
   const { routes, vehicles } = useData()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -234,9 +239,14 @@ function TripDetail({
 
   return (
     <div>
-      <button className="btn secondary" onClick={onBack} style={{ marginTop: 0 }}>
-        ‹ חזרה לנסיעות
-      </button>
+      <div className="detail-topbar">
+        <button className="btn secondary" onClick={onBack} style={{ marginTop: 0 }}>‹ חזרה לנסיעות</button>
+        {session?.role === 'admin' && (
+          <DeleteAction label={`נסיעה ${trip.items.map((i) => i.asset_id).join(',')}`}
+            run={(reason, pin) => supabase.rpc('admin_delete_trip', { session_token: token, actor_pin: pin, trip_id: trip.id, reason })}
+            onDone={onDeleted} />
+        )}
+      </div>
 
       <div className="card" style={{ marginTop: 14 }}>
         <div className="task-card-top">
