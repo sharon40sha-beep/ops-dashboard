@@ -72,8 +72,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokenRef.current = token
   }, [token])
 
+  // A.3 — log out when the app is genuinely backgrounded, but with a grace
+  // period. iOS Safari fires visibilitychange:hidden for transient reasons
+  // (keyboard dismiss, URL-bar show/hide, brief obscuring), so clearing
+  // immediately would nuke a session milliseconds after login. Instead we only
+  // clear if the app STAYS hidden past the grace window; returning to the
+  // foreground before then cancels it.
   useEffect(() => {
-    function clearForBackground() {
+    const GRACE_MS = 60_000
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    function doClear() {
       const t = tokenRef.current
       if (t) {
         try {
@@ -91,14 +100,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(null)
       setTokenState(null)
     }
+    function cancel() {
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+    }
     function onVisibility() {
-      if (document.visibilityState === 'hidden') clearForBackground()
+      if (document.visibilityState === 'hidden') {
+        if (timer) return
+        timer = setTimeout(() => {
+          timer = null
+          // still hidden after the grace window -> a real background/lock
+          if (document.visibilityState === 'hidden') doClear()
+        }, GRACE_MS)
+      } else {
+        cancel() // came back quickly -> keep the session
+      }
     }
     document.addEventListener('visibilitychange', onVisibility)
-    window.addEventListener('pagehide', clearForBackground)
     return () => {
+      cancel()
       document.removeEventListener('visibilitychange', onVisibility)
-      window.removeEventListener('pagehide', clearForBackground)
     }
   }, [])
 
