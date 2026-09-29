@@ -28,31 +28,43 @@ export default function Login() {
     if (!selected || password === '' || busy) return
     setBusy(true)
     setMsg('')
-    const { data, error: rpcError } = await supabase.rpc('verify_pin', {
-      emp_id: selected.id,
-      pin_input: password,
-    })
-    setBusy(false)
+    try {
+      const { data, error: rpcError } = await supabase.rpc('verify_pin', {
+        emp_id: selected.id,
+        pin_input: password,
+      })
+      setBusy(false)
 
-    if (rpcError) {
-      setMsg('שגיאת התחברות: ' + rpcError.message)
-      return
-    }
-    const row = (Array.isArray(data) ? data[0] : undefined) as VerifyRow | undefined
+      if (rpcError) {
+        setMsg('שגיאת התחברות: ' + rpcError.message)
+        return
+      }
+      const row = (Array.isArray(data) ? data[0] : undefined) as VerifyRow | undefined
 
-    if (row && row.id && row.name && row.role && row.session_token) {
-      // verify_pin mints one server session for every employee and returns the
-      // token; it is used for all subsequent RPC calls.
-      login({ employeeId: row.id, name: row.name, role: row.role }, row.session_token)
-      return
-    }
-    if (row && row.retry_after_seconds != null) {
+      if (row && row.id && row.name && row.role && row.session_token) {
+        // verify_pin mints one server session for every employee and returns
+        // the token; it is used for all subsequent RPC calls.
+        login({ employeeId: row.id, name: row.name, role: row.role }, row.session_token)
+        return
+      }
+      if (row && row.retry_after_seconds != null) {
+        setPassword('')
+        setMsg(`החשבון נעול עקב ניסיונות כושלים. נסה/י שוב ${retryText(row.retry_after_seconds)}`)
+        return
+      }
+      if (row && row.id && !row.session_token) {
+        // succeeded but no token came back — surface it instead of a silent bounce
+        setPassword('')
+        setMsg('ההתחברות אומתה אך לא התקבל אסימון. רענן/י ונסה/י שוב.')
+        return
+      }
       setPassword('')
-      setMsg(`החשבון נעול עקב ניסיונות כושלים. נסה/י שוב ${retryText(row.retry_after_seconds)}`)
-      return
+      setMsg('שם משתמש או סיסמה שגויים')
+    } catch (e) {
+      // any unexpected exception -> show it on screen (no dev tools on mobile)
+      setBusy(false)
+      setMsg('שגיאה בלתי צפויה: ' + (e instanceof Error ? e.message : String(e)))
     }
-    setPassword('')
-    setMsg('שם משתמש או סיסמה שגויים')
   }
 
   if (loading) return <div className="center-screen">טוען…</div>

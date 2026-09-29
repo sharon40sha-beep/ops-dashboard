@@ -839,3 +839,84 @@ textarea:focus {
   font-size: 12px;
   color: var(--text-dim);
 }
+
+/* ---------- Trips ---------- */
+.trip-assets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.asset-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.pick-chip {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-family: var(--mono);
+  font-weight: 600;
+  cursor: pointer;
+}
+.pick-chip.on {
+  border-color: var(--accent);
+  background: rgba(212, 167, 58, 0.12);
+  color: var(--accent);
+}
+.link-box {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.notes-box {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ---------- Trip / duty distinction ---------- */
+.kind-dot {
+  margin-inline-end: 6px;
+}
+.kind-tag-lg {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* ---------- Joint movement table ---------- */
+.joint-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 6px 10px;
+  margin-top: 8px;
+  align-items: center;
+}
+.joint-head {
+  font-size: 12px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+.joint-row {
+  display: contents;
+}
+.joint-row > div {
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}

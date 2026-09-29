@@ -82,6 +82,22 @@ export function passwordError(pw: string): string | null {
   return null
 }
 
+/** ISO -> value for a <input type="datetime-local"> (local wall clock). */
+export function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+/** datetime-local value -> ISO string with timezone (or null). */
+export function localToIso(local: string): string | null {
+  if (!local) return null
+  const d = new Date(local)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}
+
 /** "בעוד X דקות" from a server-computed seconds-remaining value (no client clock math). */
 export function retryText(seconds: number): string {
   const s = Math.max(0, Math.ceil(seconds))

@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { supabase } from '../utils/supabase'
 import { useAuth } from './AuthContext'
-import type { Asset, Employee, Route, Site, Task, Vehicle } from '../types'
+import type { Asset, DutyShift, Employee, Route, Site, Trip, Vehicle } from '../types'
 
 interface DataValue {
   employees: Employee[]
@@ -18,10 +18,14 @@ interface DataValue {
   assets: Asset[]
   routes: Route[]
   vehicles: Vehicle[]
-  /** Open (non-completed) tasks visible to the current user. */
-  tasks: Task[]
-  /** Completed tasks visible to the current user. */
-  history: Task[]
+  /** Open (non-completed) trips visible to the current user. */
+  trips: Trip[]
+  /** Completed trips visible to the current user. */
+  history: Trip[]
+  /** Open (non-completed) duty shifts. */
+  duties: DutyShift[]
+  /** Completed duty shifts. */
+  dutyHistory: DutyShift[]
   loading: boolean
   error: string | null
   refresh: () => Promise<void>
@@ -40,8 +44,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [assets, setAssets] = useState<Asset[]>([])
   const [routes, setRoutes] = useState<Route[]>([])
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [history, setHistory] = useState<Task[]>([])
+  const [trips, setTrips] = useState<Trip[]>([])
+  const [history, setHistory] = useState<Trip[]>([])
+  const [duties, setDuties] = useState<DutyShift[]>([])
+  const [dutyHistory, setDutyHistory] = useState<DutyShift[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -66,16 +72,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Tasks + history now come through session-scoped RPCs (Part B).
   const refresh = useCallback(async () => {
     if (!token) {
-      setTasks([])
-      setHistory([])
+      setTrips([]); setHistory([]); setDuties([]); setDutyHistory([])
       return
     }
     setError(null)
-    const [openRes, histRes] = await Promise.all([
-      supabase.rpc(isAdmin ? 'list_all_tasks' : 'list_my_tasks', { session_token: token }),
-      supabase.rpc('list_task_history', { session_token: token }),
+    const [openRes, histRes, dutyRes, dutyHistRes] = await Promise.all([
+      supabase.rpc(isAdmin ? 'list_all_trips' : 'list_my_trips', { session_token: token }),
+      supabase.rpc('list_trip_history', { session_token: token }),
+      supabase.rpc(isAdmin ? 'list_all_duties' : 'list_my_duties', { session_token: token }),
+      supabase.rpc('list_duty_history', { session_token: token }),
     ])
-    const firstError = openRes.error || histRes.error
+    const firstError = openRes.error || histRes.error || dutyRes.error || dutyHistRes.error
     if (firstError) {
       // an expired/invalid session forces a fresh login
       if (String(firstError.message).includes('session')) {
@@ -85,8 +92,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setError(firstError.message)
       return
     }
-    setTasks((openRes.data as Task[]) ?? [])
-    setHistory((histRes.data as Task[]) ?? [])
+    // these RPCs return a jsonb array (trips carry nested items; duties carry a label)
+    setTrips((openRes.data as Trip[]) ?? [])
+    setHistory((histRes.data as Trip[]) ?? [])
+    setDuties((dutyRes.data as DutyShift[]) ?? [])
+    setDutyHistory((dutyHistRes.data as DutyShift[]) ?? [])
   }, [token, isAdmin, logout])
 
   useEffect(() => {
@@ -119,9 +129,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const value = useMemo<DataValue>(
     () => ({
       employees, sites, sitesById, assets, routes, vehicles,
-      tasks, history, loading, error, refresh, refreshReference: loadReference,
+      trips, history, duties, dutyHistory, loading, error, refresh, refreshReference: loadReference,
     }),
-    [employees, sites, sitesById, assets, routes, vehicles, tasks, history, loading, error, refresh, loadReference],
+    [employees, sites, sitesById, assets, routes, vehicles, trips, history, duties, dutyHistory, loading, error, refresh, loadReference],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { supabase } from '../utils/supabase'
-import type { AssetSummary } from '../types'
+import type { AssetSummary, JointPair } from '../types'
 
 function isoLocal(d: Date): string {
   const y = d.getFullYear()
@@ -46,6 +46,7 @@ export default function Summary() {
   const [from, setFrom] = useState(isoLocal(new Date(Date.now() - 30 * 864e5)))
   const [to, setTo] = useState(isoLocal(new Date()))
   const [data, setData] = useState<AssetSummary | null>(null)
+  const [joint, setJoint] = useState<JointPair[]>([])
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
 
@@ -81,6 +82,16 @@ export default function Summary() {
   useEffect(() => {
     void load()
   }, [load])
+
+  // D: joint movement (period-scoped, all assets)
+  useEffect(() => {
+    if (!token) return
+    void supabase
+      .rpc('admin_joint_movement_summary', { session_token: token, from_date: from, to_date: to })
+      .then(({ data: res, error }) => {
+        if (!error) setJoint((res as JointPair[]) ?? [])
+      })
+  }, [token, from, to])
 
   const hourItems = useMemo(
     () => (data?.hours ?? []).map((h) => ({ key: `${String(h.hour).padStart(2, '0')}:00`, count: h.count })),
@@ -147,6 +158,28 @@ export default function Summary() {
           <Bars title="לפי עובד" items={data.by_worker} total={data.total} />
         </>
       )}
+
+      <div className="card">
+        <h2>תנועה משותפת (כל המוצרים בתקופה)</h2>
+        <p className="muted">כמה פעמים כל צמד מוצרים נסע באותה נסיעה, ומה האחוז מנסיעות כל אחד.</p>
+        {joint.length === 0 && <p className="muted">אין נתונים בתקופה.</p>}
+        {joint.length > 0 && (
+          <div className="joint-grid">
+            <div className="joint-head">צמד</div>
+            <div className="joint-head">משותף</div>
+            <div className="joint-head">% מ-א׳</div>
+            <div className="joint-head">% מ-ב׳</div>
+            {joint.map((p) => (
+              <div className="joint-row" key={`${p.a}-${p.b}`}>
+                <div><span className="code sm">{p.a}</span> + <span className="code sm">{p.b}</span></div>
+                <div>{p.joint}</div>
+                <div>{p.pct_a ?? 0}%</div>
+                <div>{p.pct_b ?? 0}%</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

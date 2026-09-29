@@ -42,6 +42,96 @@ export interface Asset {
   id: string // 'A1'..'A6'
   home_site_id: string
   is_active?: boolean
+  checklist_template_id?: string | null
+}
+
+/** A managed checklist template (one per asset). */
+export interface ChecklistTemplate {
+  id: string
+  name: string
+  is_active: boolean
+}
+
+/** One asset inside a trip, with its own copied checklist. */
+export interface TripItem {
+  id: string
+  trip_id: string
+  asset_id: string
+  checklist: ChecklistItem[]
+  checklist_note: string | null
+}
+
+/** A trip = one real movement carrying one or more assets. */
+export interface Trip {
+  id: string
+  from_site_id: string
+  to_site_id: string
+  worker_id: string
+  vehicle_id: string | null
+  route_id: string | null
+  time_window: string
+  status: TaskStatus
+  return_of_trip_id: string | null
+  actual: TaskActual | null
+  audit_log: string[]
+  started_at: string | null
+  created_at: string
+  items: TripItem[]
+}
+
+export interface LinkableTrip {
+  id: string
+  label: string
+}
+
+// ---- duties (E) ----
+export interface DutyType {
+  id: string
+  label: string
+  checklist_template_id: string | null
+  is_active: boolean
+}
+
+export interface DutyActual {
+  actual_start: string | null
+  actual_end: string | null
+  anomaly_found: boolean
+  anomaly_notes: string
+  completed_at?: string
+}
+
+export interface DutyShift {
+  id: string
+  site_id: string
+  worker_id: string
+  duty_type_id: string
+  duty_type_label: string
+  start_time: string
+  end_time: string
+  status: TaskStatus
+  checklist: ChecklistItem[]
+  checklist_note: string | null
+  actual: DutyActual | null
+  audit_log: string[]
+  created_at: string
+}
+
+// ---- analytics (D) ----
+export interface JointPair {
+  a: string
+  b: string
+  joint: number
+  total_a: number
+  total_b: number
+  pct_a: number
+  pct_b: number
+}
+
+export interface DutySummary {
+  total: number
+  anomalies: number
+  by_type: { key: string; count: number }[]
+  by_worker: { key: string; count: number }[]
 }
 
 export interface Route {
