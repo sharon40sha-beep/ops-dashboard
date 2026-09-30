@@ -58,10 +58,10 @@ begin
   end if;
 
   -- capture old sets, then the new ones, for the audit-log field diff
-  select array_agg(employee_id order by employee_id) into v_old_w from public.trip_workers where trip_id = update_trip.trip_id;
-  select array_agg(vehicle_id order by vehicle_id)  into v_old_v from public.trip_vehicles where trip_id = update_trip.trip_id;
-  select array_agg(route_id order by sequence)      into v_old_r from public.trip_route_segments where trip_id = update_trip.trip_id;
-  select array_agg(asset_id order by asset_id)      into v_old_a from public.trip_items where trip_id = update_trip.trip_id;
+  select array_agg(tw.employee_id order by tw.employee_id) into v_old_w from public.trip_workers tw        where tw.trip_id = update_trip.trip_id;
+  select array_agg(tv.vehicle_id order by tv.vehicle_id)   into v_old_v from public.trip_vehicles tv       where tv.trip_id = update_trip.trip_id;
+  select array_agg(s.route_id order by s.sequence)         into v_old_r from public.trip_route_segments s  where s.trip_id  = update_trip.trip_id;
+  select array_agg(ti.asset_id order by ti.asset_id)       into v_old_a from public.trip_items ti          where ti.trip_id = update_trip.trip_id;
 
   select array_agg(w order by w) into v_new_w from unnest(worker_ids) w;
   select array_agg(btrim(v) order by btrim(v)) into v_new_v from unnest(vehicle_ids) v where nullif(btrim(v), '') is not null;
@@ -94,9 +94,9 @@ begin
   where t.id = update_trip.trip_id;
 
   -- replace workers / vehicles / route segments
-  delete from public.trip_workers        where trip_id = update_trip.trip_id;
-  delete from public.trip_vehicles       where trip_id = update_trip.trip_id;
-  delete from public.trip_route_segments where trip_id = update_trip.trip_id;
+  delete from public.trip_workers        tw where tw.trip_id = update_trip.trip_id;
+  delete from public.trip_vehicles       tv where tv.trip_id = update_trip.trip_id;
+  delete from public.trip_route_segments s  where s.trip_id  = update_trip.trip_id;
 
   foreach v_w in array worker_ids loop
     insert into public.trip_workers (trip_id, employee_id) values (update_trip.trip_id, v_w) on conflict do nothing;
@@ -167,7 +167,7 @@ begin
     raise exception 'at least one worker required' using errcode = '22023';
   end if;
 
-  select array_agg(employee_id order by employee_id) into v_old_w from public.duty_shift_workers where duty_shift_id = update_duty_shift.duty_shift_id;
+  select array_agg(dw.employee_id order by dw.employee_id) into v_old_w from public.duty_shift_workers dw where dw.duty_shift_id = update_duty_shift.duty_shift_id;
   select array_agg(w order by w) into v_new_w from unnest(worker_ids) w;
   v_type_changed := v_shift.duty_type_id is distinct from update_duty_shift.duty_type_id;
 
@@ -196,7 +196,7 @@ begin
       coalesce(nullif(array_to_string(v_changes, ', '), ''), 'ללא שינוי'))
   where d.id = update_duty_shift.duty_shift_id;
 
-  delete from public.duty_shift_workers where duty_shift_id = update_duty_shift.duty_shift_id;
+  delete from public.duty_shift_workers dw where dw.duty_shift_id = update_duty_shift.duty_shift_id;
   foreach v_w in array worker_ids loop
     insert into public.duty_shift_workers (duty_shift_id, employee_id) values (update_duty_shift.duty_shift_id, v_w) on conflict do nothing;
   end loop;
