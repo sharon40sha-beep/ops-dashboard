@@ -71,16 +71,16 @@ begin
     where nullif(btrim(e.value->>'route_id'), '') is not null) q;
   select array_agg(a order by a) into v_new_a from unnest(asset_ids) a;
 
-  if v_trip.from_site_id           is distinct from update_trip.from_site_id       then v_changes := v_changes || 'מאתר'; end if;
-  if v_trip.to_site_id             is distinct from update_trip.to_site_id         then v_changes := v_changes || 'לאתר'; end if;
-  if v_trip.scheduled_date         is distinct from update_trip.scheduled_date     then v_changes := v_changes || 'תאריך'; end if;
-  if v_trip.planned_start_time     is distinct from update_trip.planned_start_time then v_changes := v_changes || 'שעת התחלה'; end if;
-  if v_trip.planned_end_time       is distinct from update_trip.planned_end_time   then v_changes := v_changes || 'שעת סיום'; end if;
-  if v_trip.planned_entry_point_id is distinct from update_trip.entry_point_id     then v_changes := v_changes || 'שער'; end if;
-  if coalesce(v_old_w, '{}') is distinct from coalesce(v_new_w, '{}') then v_changes := v_changes || 'עובדים'; end if;
-  if coalesce(v_old_v, '{}') is distinct from coalesce(v_new_v, '{}') then v_changes := v_changes || 'רכבים'; end if;
-  if coalesce(v_old_r, '{}') is distinct from coalesce(v_new_r, '{}') then v_changes := v_changes || 'מסלול'; end if;
-  if coalesce(v_old_a, '{}') is distinct from coalesce(v_new_a, '{}') then v_changes := v_changes || 'מוצרים'; end if;
+  if v_trip.from_site_id           is distinct from update_trip.from_site_id       then v_changes := array_append(v_changes, 'מאתר'); end if;
+  if v_trip.to_site_id             is distinct from update_trip.to_site_id         then v_changes := array_append(v_changes, 'לאתר'); end if;
+  if v_trip.scheduled_date         is distinct from update_trip.scheduled_date     then v_changes := array_append(v_changes, 'תאריך'); end if;
+  if v_trip.planned_start_time     is distinct from update_trip.planned_start_time then v_changes := array_append(v_changes, 'שעת התחלה'); end if;
+  if v_trip.planned_end_time       is distinct from update_trip.planned_end_time   then v_changes := array_append(v_changes, 'שעת סיום'); end if;
+  if v_trip.planned_entry_point_id is distinct from update_trip.entry_point_id     then v_changes := array_append(v_changes, 'שער'); end if;
+  if coalesce(v_old_w, '{}') is distinct from coalesce(v_new_w, '{}') then v_changes := array_append(v_changes, 'עובדים'); end if;
+  if coalesce(v_old_v, '{}') is distinct from coalesce(v_new_v, '{}') then v_changes := array_append(v_changes, 'רכבים'); end if;
+  if coalesce(v_old_r, '{}') is distinct from coalesce(v_new_r, '{}') then v_changes := array_append(v_changes, 'מסלול'); end if;
+  if coalesce(v_old_a, '{}') is distinct from coalesce(v_new_a, '{}') then v_changes := array_append(v_changes, 'מוצרים'); end if;
 
   update public.trips t set
     from_site_id           = update_trip.from_site_id,
@@ -171,11 +171,11 @@ begin
   select array_agg(w order by w) into v_new_w from unnest(worker_ids) w;
   v_type_changed := v_shift.duty_type_id is distinct from update_duty_shift.duty_type_id;
 
-  if v_shift.site_id    is distinct from update_duty_shift.site_id    then v_changes := v_changes || 'אתר'; end if;
-  if v_type_changed                                                   then v_changes := v_changes || 'סוג משמרת'; end if;
-  if v_shift.start_time is distinct from update_duty_shift.start_time then v_changes := v_changes || 'התחלה'; end if;
-  if v_shift.end_time   is distinct from update_duty_shift.end_time   then v_changes := v_changes || 'סיום'; end if;
-  if coalesce(v_old_w, '{}') is distinct from coalesce(v_new_w, '{}') then v_changes := v_changes || 'עובדים'; end if;
+  if v_shift.site_id    is distinct from update_duty_shift.site_id    then v_changes := array_append(v_changes, 'אתר'); end if;
+  if v_type_changed                                                   then v_changes := array_append(v_changes, 'סוג משמרת'); end if;
+  if v_shift.start_time is distinct from update_duty_shift.start_time then v_changes := array_append(v_changes, 'התחלה'); end if;
+  if v_shift.end_time   is distinct from update_duty_shift.end_time   then v_changes := array_append(v_changes, 'סיום'); end if;
+  if coalesce(v_old_w, '{}') is distinct from coalesce(v_new_w, '{}') then v_changes := array_append(v_changes, 'עובדים'); end if;
 
   -- if the duty type changed, rebuild the checklist from the new type's template
   if v_type_changed then
