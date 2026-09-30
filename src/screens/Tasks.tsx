@@ -27,6 +27,21 @@ function routesText(segs: { route_id: string | null }[]): string {
   return r.length ? r.join(' → ') : '—'
 }
 
+/** 'YYYY-MM-DD' -> 'DD/MM/YYYY'. */
+function fmtDate(d: string): string {
+  const p = d?.split('-')
+  return p && p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d
+}
+const hm = (t: string | null) => (t ? t.slice(0, 5) : '')
+/** planned window like "08:00–09:30" / "מ־08:00" / "עד 09:30", or '' if none. */
+function plannedWindow(trip: Trip): string {
+  const s = hm(trip.planned_start_time), e = hm(trip.planned_end_time)
+  if (s && e) return `${s}–${e}`
+  if (s) return `מ־${s}`
+  if (e) return `עד ${e}`
+  return ''
+}
+
 const STATUS_HE: Record<Trip['status'], string> = {
   planned: 'מתוכננת',
   active: 'פעילה',
@@ -102,6 +117,7 @@ export default function Tasks() {
                   <SiteLabel id={r.trip.to_site_id} />
                 </div>
                 <div className="task-card-meta">
+                  <span>תאריך: {fmtDate(r.trip.scheduled_date)}</span>
                   <span>ציר: <strong>{routesText(r.trip.route_segments)}</strong></span>
                   {r.trip.vehicle_ids.length > 0 && <span>רכב: <span className="code sm">{r.trip.vehicle_ids.join(', ')}</span></span>}
                   {r.trip.workers.length > 0 && <span>עובדים: {r.trip.workers.map((w) => w.name).join(', ')}</span>}
@@ -284,7 +300,8 @@ function TripDetail({
           <span>ציר מתוכנן: <strong>{routesText(trip.route_segments)}</strong></span>
           {trip.vehicle_ids.length > 0 && <span>רכב מתוכנן: <span className="code sm">{trip.vehicle_ids.join(', ')}</span></span>}
           {trip.entry_point && <span>שער יעד: {trip.entry_point}</span>}
-          {trip.time_window && <span>חלון זמן: {trip.time_window}</span>}
+          <span>תאריך: {fmtDate(trip.scheduled_date)}</span>
+          {plannedWindow(trip) && <span>שעות מתוכננות: {plannedWindow(trip)}</span>}
           {trip.workers.length > 0 && <span>עובדים: {trip.workers.map((w) => w.name).join(', ')}</span>}
         </div>
         {trip.route_segments.some((s) => s.checkpoint_note) && (

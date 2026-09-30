@@ -99,12 +99,15 @@ export interface Trip {
   route_segments: RouteSegment[]
   planned_entry_point_id: string | null
   entry_point: string | null // label of the planned entry point (join)
-  time_window: string
+  scheduled_date: string // 'YYYY-MM-DD' — REQUIRED, the planned day
+  planned_start_time: string | null // 'HH:MM[:SS]' — optional guidance only
+  planned_end_time: string | null
   status: TaskStatus
   return_of_trip_id: string | null
   actual: TripActual | null
   audit_log: string[]
-  started_at: string | null
+  actual_started_at: string | null // system-stamped at Start (real click time)
+  actual_completed_at: string | null // system-stamped at Complete
   created_at: string
   excluded_from_analysis?: boolean
   excluded_reason?: string | null

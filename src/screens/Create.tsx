@@ -30,7 +30,9 @@ export default function Create() {
   const [vehiclesPicked, setVehiclesPicked] = useState<Set<string>>(new Set())
   const [segments, setSegments] = useState<DraftSegment[]>([{ route_id: '', checkpoint_note: '' }])
   const [entryPointId, setEntryPointId] = useState('')
-  const [timeWindow, setTimeWindow] = useState('')
+  const [scheduledDate, setScheduledDate] = useState('')
+  const [plannedStart, setPlannedStart] = useState('')
+  const [plannedEnd, setPlannedEnd] = useState('')
   const [isReturn, setIsReturn] = useState(false)
   const [returnOf, setReturnOf] = useState('')
   const [linkable, setLinkable] = useState<LinkableTrip[]>([])
@@ -117,6 +119,7 @@ export default function Create() {
     if (picked.size === 0) return setErr('יש לבחור לפחות מוצר אחד')
     if (!fromSite || !effectiveTo) return setErr('יש לבחור מאתר ולאתר')
     if (workers.size === 0) return setErr('יש לבחור לפחות עובד מבצע אחד')
+    if (!scheduledDate) return setErr('יש לבחור תאריך מתוכנן')
     if (isReturn && !returnOf) return setErr('בחר/י את נסיעת ההלוך המקושרת')
     if (!session || !token) return
 
@@ -133,7 +136,9 @@ export default function Create() {
       vehicle_ids: [...vehiclesPicked],
       route_segments: cleanSegments,
       entry_point_id: entryPointId || null,
-      time_window: timeWindow.trim(),
+      scheduled_date: scheduledDate,
+      planned_start_time: plannedStart || null,
+      planned_end_time: plannedEnd || null,
       asset_ids: [...picked],
       return_of_trip_id: isReturn ? returnOf : null,
     })
@@ -148,7 +153,9 @@ export default function Create() {
     setVehiclesPicked(new Set())
     setSegments([{ route_id: '', checkpoint_note: '' }])
     setEntryPointId('')
-    setTimeWindow('')
+    setScheduledDate('')
+    setPlannedStart('')
+    setPlannedEnd('')
     setIsReturn(false)
     setReturnOf('')
     setToast(`נוצרה נסיעה (${fromSite} ← ${effectiveTo})`)
@@ -276,8 +283,18 @@ export default function Create() {
           {destEntryPoints.map((ep) => <option key={ep.id} value={ep.id}>{ep.label}</option>)}
         </select>
 
-        <label>חלון זמן</label>
-        <input type="text" value={timeWindow} placeholder="לדוגמה 08:00–09:30" onChange={(e) => setTimeWindow(e.target.value)} />
+        <label>תאריך מתוכנן *</label>
+        <input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} />
+
+        <label>שעות מתוכננות (הכוונה כללית, לא מחייב)</label>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <input type="time" value={plannedStart} onChange={(e) => setPlannedStart(e.target.value)} placeholder="התחלה" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <input type="time" value={plannedEnd} onChange={(e) => setPlannedEnd(e.target.value)} placeholder="סיום" />
+          </div>
+        </div>
 
         <label className="inline-check" style={{ marginTop: 14 }}>
           <input type="checkbox" checked={isReturn} onChange={(e) => setIsReturn(e.target.checked)} />
