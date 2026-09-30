@@ -63,10 +63,9 @@ export interface Asset {
   id: string // 'A1'..'A6'
   home_site_id: string
   is_active?: boolean
-  checklist_template_id?: string | null
 }
 
-/** A managed checklist template (one per asset). */
+/** A managed checklist template. An asset may be linked to several. */
 export interface ChecklistTemplate {
   id: string
   name: string

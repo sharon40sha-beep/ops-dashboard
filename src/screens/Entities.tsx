@@ -6,7 +6,7 @@ import Toast from '../components/Toast'
 import DeleteAction from '../components/DeleteAction'
 
 type Section = 'assets' | 'sites' | 'sitetypes' | 'entrypoints' | 'routes' | 'vehicles'
-interface AAsset { id: string; home_site_id: string; is_active: boolean; checklist_template_id: string | null }
+interface AAsset { id: string; home_site_id: string; is_active: boolean; template_ids: string[] }
 interface ASite { id: string; site_type_id: string | null; is_active: boolean }
 interface ACode { id: string; is_active: boolean }
 interface ATemplate { id: string; name: string; is_active: boolean }
@@ -43,7 +43,7 @@ export default function Entities() {
   const [nType, setNType] = useState('')      // site's type (add site) / entry's site
   const [nLabel, setNLabel] = useState('')    // site-type / entry-point label
   const [nEntrySite, setNEntrySite] = useState('')
-  const [nTpl, setNTpl] = useState('')
+  const [nTpls, setNTpls] = useState<Set<string>>(new Set()) // templates for a new asset
 
   const guard = (message: string): boolean => {
     if (message.includes('session')) { logout(); return true }
@@ -79,7 +79,7 @@ export default function Entities() {
   async function after(error: { message: string } | null, okMsg: string) {
     if (error) { guard(error.message); return }
     setErr(''); setToast(okMsg)
-    setNId(''); setNHome(''); setNType(''); setNLabel(''); setNEntrySite(''); setNTpl('')
+    setNId(''); setNHome(''); setNType(''); setNLabel(''); setNEntrySite(''); setNTpls(new Set())
     await load()
     void refreshReference() // pickers elsewhere reflect the change
   }
@@ -94,7 +94,7 @@ export default function Entities() {
       if (nId.trim() === '') return setErr('הזן קוד')
       if (!nHome) return setErr('בחר מחסן-בית')
       return after((await supabase.rpc('admin_add_asset', {
-        session_token: token, id: nId.trim(), home_site_id: nHome, checklist_template_id: nTpl || null,
+        session_token: token, id: nId.trim(), home_site_id: nHome, template_ids: [...nTpls],
       })).error, 'נוסף')
     }
     if (section === 'sites') {
@@ -127,8 +127,17 @@ export default function Entities() {
     if (!token) return
     return after((await supabase.rpc('admin_update_asset', {
       session_token: token, id: a.id, home_site_id: a.home_site_id, is_active: a.is_active,
-      checklist_template_id: a.checklist_template_id,
     })).error, 'נשמר')
+  }
+  // toggle a template link on an asset and persist immediately
+  async function toggleAssetTemplate(a: AAsset, tid: string) {
+    if (!token) return
+    const next = a.template_ids.includes(tid) ? a.template_ids.filter((x) => x !== tid) : [...a.template_ids, tid]
+    setAssets((rs) => rs.map((x) => (x.id === a.id ? { ...x, template_ids: next } : x)))
+    const { error } = await supabase.rpc('admin_set_asset_templates', { session_token: token, asset_id: a.id, template_ids: next })
+    if (error) { guard(error.message); return }
+    setToast('תבניות נשמרו')
+    void refreshReference()
   }
   async function saveSite(s: ASite) {
     if (!token) return
@@ -183,11 +192,16 @@ export default function Entities() {
               <option value="">— בחר אתר —</option>
               {sites.map((s) => <option key={s.id} value={s.id}>{s.id} · {typeLabel(s.site_type_id)}</option>)}
             </select>
-            <label>תבנית צ׳קליסט</label>
-            <select value={nTpl} onChange={(e) => setNTpl(e.target.value)}>
-              <option value="">— ללא (צ׳קליסט ריק) —</option>
-              {templates.filter((t) => t.is_active).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+            <label>תבניות צ׳קליסט (אפשר כמה)</label>
+            <div className="asset-pick">
+              {templates.filter((t) => t.is_active).length === 0 && <p className="muted">אין תבניות פעילות</p>}
+              {templates.filter((t) => t.is_active).map((t) => (
+                <button key={t.id} type="button" className={`pick-chip ${nTpls.has(t.id) ? 'on' : ''}`}
+                  onClick={() => setNTpls((s) => { const n = new Set(s); if (n.has(t.id)) n.delete(t.id); else n.add(t.id); return n })}>
+                  {t.name}
+                </button>
+              ))}
+            </div>
           </>
         )}
         {section === 'sites' && (
@@ -239,15 +253,21 @@ export default function Entities() {
                         onChange={(e) => setAssets((rs) => rs.map((x) => x.id === a.id ? { ...x, home_site_id: e.target.value } : x))}>
                   {sites.map((s) => <option key={s.id} value={s.id}>{s.id}</option>)}
                 </select>
-                <select value={a.checklist_template_id ?? ''}
-                        onChange={(e) => setAssets((rs) => rs.map((x) => x.id === a.id ? { ...x, checklist_template_id: e.target.value || null } : x))}>
-                  <option value="">— ללא תבנית —</option>
-                  {templates.filter((t) => t.is_active || t.id === a.checklist_template_id).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
                 <button className="btn sm" onClick={() => void saveAsset(a)}>שמור</button>
                 <DeleteAction label={`מוצר ${a.id}`} small
                   run={(reason, pin) => supabase.rpc('admin_delete_asset', { session_token: token, actor_pin: pin, id: a.id, reason })}
                   onDone={() => { void load(); void refreshReference() }} />
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <span className="muted" style={{ fontSize: 13 }}>תבניות צ׳קליסט (נשמר אוטומטית):</span>
+                <div className="asset-pick" style={{ marginTop: 6 }}>
+                  {templates.filter((t) => t.is_active || a.template_ids.includes(t.id)).map((t) => (
+                    <button key={t.id} type="button" className={`pick-chip ${a.template_ids.includes(t.id) ? 'on' : ''}`}
+                      onClick={() => void toggleAssetTemplate(a, t.id)}>
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           ))}

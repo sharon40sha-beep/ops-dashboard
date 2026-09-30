@@ -3,9 +3,11 @@ import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { supabase } from '../utils/supabase'
 import { DEFAULT_TO_SITE, localToIso, toLocalInput, siteLabel } from '../lib/ops'
-import type { DutyType, LinkableTrip } from '../types'
+import type { ChecklistTemplate, DutyType, LinkableTrip } from '../types'
 import type { EditTarget } from '../App'
 import Toast from '../components/Toast'
+
+interface AssetTpl { id: string; template_ids: string[] }
 
 interface DraftSegment { route_id: string; checkpoint_note: string }
 
@@ -46,6 +48,10 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
   const [isReturn, setIsReturn] = useState(false)
   const [returnOf, setReturnOf] = useState('')
   const [linkable, setLinkable] = useState<LinkableTrip[]>([])
+  // asset -> its linked template ids, template id -> name, and the admin's per-asset choice
+  const [assetTpls, setAssetTpls] = useState<Map<string, string[]>>(new Map())
+  const [tplName, setTplName] = useState<Map<string, string>>(new Map())
+  const [chosenTpl, setChosenTpl] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const [toast, setToast] = useState('')
@@ -73,7 +79,26 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
     void supabase.rpc('admin_list_duty_types', { session_token: token }).then(({ data }) => {
       setDutyTypes((data as DutyType[]) ?? [])
     })
+    void supabase.rpc('admin_list_assets', { session_token: token }).then(({ data }) => {
+      const rows = (data as AssetTpl[]) ?? []
+      setAssetTpls(new Map(rows.map((r) => [r.id, r.template_ids ?? []])))
+    })
+    void supabase.rpc('admin_list_templates', { session_token: token }).then(({ data }) => {
+      const rows = (data as ChecklistTemplate[]) ?? []
+      setTplName(new Map(rows.map((t) => [t.id, t.name])))
+    })
   }, [token])
+
+  // the effective template for a picked asset: the admin's choice, else the only
+  // linked one, else none (empty checklist).
+  function effectiveTpl(assetId: string): string {
+    const tids = assetTpls.get(assetId) ?? []
+    if (chosenTpl[assetId] && tids.includes(chosenTpl[assetId])) return chosenTpl[assetId]
+    return tids.length >= 1 ? tids[0] : ''
+  }
+  function buildAssets() {
+    return [...picked].map((id) => ({ asset_id: id, template_id: effectiveTpl(id) || null }))
+  }
 
   // the chosen entry point must belong to the current destination
   useEffect(() => {
@@ -148,7 +173,7 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
           worker_ids: [...workers], vehicle_ids: [...vehiclesPicked],
           route_segments: cleanSegments, entry_point_id: entryPointId || null,
           scheduled_date: scheduledDate, planned_start_time: plannedStart || null, planned_end_time: plannedEnd || null,
-          asset_ids: [...picked],
+          p_assets: buildAssets(),
         })
       : await supabase.rpc('create_trip', {
           session_token: token,
@@ -156,7 +181,7 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
           worker_ids: [...workers], vehicle_ids: [...vehiclesPicked],
           route_segments: cleanSegments, entry_point_id: entryPointId || null,
           scheduled_date: scheduledDate, planned_start_time: plannedStart || null, planned_end_time: plannedEnd || null,
-          asset_ids: [...picked],
+          p_assets: buildAssets(),
           return_of_trip_id: isReturn ? returnOf : null,
         })
     setSaving(false)
@@ -243,6 +268,23 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
             </button>
           ))}
         </div>
+
+        {/* per-asset template choice — only when an asset has more than one linked template */}
+        {[...picked].some((id) => (assetTpls.get(id) ?? []).length > 1) && (
+          <>
+            <label>תבנית צ׳קליסט לכל מוצר</label>
+            <div className="seg-list">
+              {[...picked].filter((id) => (assetTpls.get(id) ?? []).length > 1).map((id) => (
+                <div className="seg-row" key={id}>
+                  <span className="code">{id}</span>
+                  <select value={effectiveTpl(id)} onChange={(e) => setChosenTpl((m) => ({ ...m, [id]: e.target.value }))}>
+                    {(assetTpls.get(id) ?? []).map((tid) => <option key={tid} value={tid}>{tplName.get(tid) ?? tid}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         <div style={{ display: 'flex', gap: 12 }}>
           <div style={{ flex: 1 }}>
