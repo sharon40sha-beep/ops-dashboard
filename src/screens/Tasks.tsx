@@ -4,6 +4,7 @@ import { useData } from '../context/DataContext'
 import { supabase } from '../utils/supabase'
 import { fmtDateTime, siteTypeLabel } from '../lib/ops'
 import type { ChecklistItem, Trip, TripItem } from '../types'
+import type { EditTarget } from '../App'
 import Toast from '../components/Toast'
 import DutyDetail from './DutyDetail'
 import DeleteAction from '../components/DeleteAction'
@@ -48,7 +49,7 @@ const STATUS_HE: Record<Trip['status'], string> = {
   completed: 'הושלמה',
 }
 
-export default function Tasks() {
+export default function Tasks({ onEdit }: { onEdit: (t: EditTarget) => void }) {
   const { trips, duties, loading, refresh } = useData()
   const [open, setOpen] = useState<{ kind: 'trip' | 'duty'; id: string } | null>(null)
   const [toast, setToast] = useState('')
@@ -71,6 +72,7 @@ export default function Tasks() {
         <TripDetail
           trip={openTrip}
           onBack={() => setOpen(null)}
+          onEdit={onEdit}
           onSaved={(msg) => { void refresh(); if (msg) setToast(msg) }}
           onCompleted={() => { setOpen(null); void refresh(); setToast('הנסיעה הושלמה') }}
           onDeleted={() => { setOpen(null); void refresh(); setToast('נמחק') }}
@@ -86,6 +88,7 @@ export default function Tasks() {
         <DutyDetail
           duty={openDuty}
           onBack={() => setOpen(null)}
+          onEdit={onEdit}
           onSaved={(msg) => { void refresh(); if (msg) setToast(msg) }}
           onCompleted={() => { setOpen(null); void refresh(); setToast('המשמרת הושלמה') }}
           onDeleted={() => { setOpen(null); void refresh(); setToast('נמחק') }}
@@ -155,12 +158,14 @@ interface LocalItem { id: string; asset_id: string; checklist: ChecklistItem[]; 
 function TripDetail({
   trip,
   onBack,
+  onEdit,
   onSaved,
   onCompleted,
   onDeleted,
 }: {
   trip: Trip
   onBack: () => void
+  onEdit: (t: EditTarget) => void
   onDeleted: () => void
   onSaved: (msg?: string) => void
   onCompleted: () => void
@@ -278,9 +283,14 @@ function TripDetail({
       <div className="detail-topbar">
         <button className="btn secondary" onClick={onBack} style={{ marginTop: 0 }}>‹ חזרה לנסיעות</button>
         {session?.role === 'admin' && (
-          <DeleteAction label={`נסיעה ${trip.items.map((i) => i.asset_id).join(',')}`}
-            run={(r, pin) => supabase.rpc('admin_delete_trip', { session_token: token, actor_pin: pin, trip_id: trip.id, reason: r })}
-            onDone={onDeleted} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            {trip.status === 'planned' && (
+              <button className="btn secondary" style={{ marginTop: 0 }} onClick={() => onEdit({ kind: 'trip', id: trip.id })}>ערוך</button>
+            )}
+            <DeleteAction label={`נסיעה ${trip.items.map((i) => i.asset_id).join(',')}`}
+              run={(r, pin) => supabase.rpc('admin_delete_trip', { session_token: token, actor_pin: pin, trip_id: trip.id, reason: r })}
+              onDone={onDeleted} />
+          </div>
         )}
       </div>
 

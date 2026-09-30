@@ -2,15 +2,21 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { supabase } from '../utils/supabase'
-import { DEFAULT_TO_SITE, localToIso, siteLabel } from '../lib/ops'
+import { DEFAULT_TO_SITE, localToIso, toLocalInput, siteLabel } from '../lib/ops'
 import type { DutyType, LinkableTrip } from '../types'
+import type { EditTarget } from '../App'
 import Toast from '../components/Toast'
 
 interface DraftSegment { route_id: string; checkpoint_note: string }
 
-export default function Create() {
+export default function Create({ editTarget, onDone }: { editTarget?: EditTarget | null; onDone?: () => void } = {}) {
   const { session, token, logout } = useAuth()
-  const { assets, sites, sitesById, siteTypesById, routes, vehicles, entryPoints, employees, refresh } = useData()
+  const { assets, sites, sitesById, siteTypesById, routes, vehicles, entryPoints, employees, trips, duties, refresh } = useData()
+
+  // Edit mode: find the planned task we were asked to edit (fixed for this mount).
+  const editTrip = editTarget?.kind === 'trip' ? trips.find((t) => t.id === editTarget.id) : undefined
+  const editDuty = editTarget?.kind === 'duty' ? duties.find((d) => d.id === editTarget.id) : undefined
+  const isEdit = !!(editTrip || editDuty)
 
   const activeAssets = useMemo(
     () => assets.filter((a) => a.is_active !== false).sort((a, b) => (a.id < b.id ? -1 : 1)),
@@ -23,16 +29,20 @@ export default function Create() {
   const activeRoutes = useMemo(() => routes.filter((r) => r.is_active), [routes])
   const activeVehicles = useMemo(() => vehicles.filter((v) => v.is_active), [vehicles])
 
-  const [picked, setPicked] = useState<Set<string>>(new Set())
-  const [fromSite, setFromSite] = useState('')
-  const [toSite, setToSite] = useState('')
-  const [workers, setWorkers] = useState<Set<string>>(new Set())
-  const [vehiclesPicked, setVehiclesPicked] = useState<Set<string>>(new Set())
-  const [segments, setSegments] = useState<DraftSegment[]>([{ route_id: '', checkpoint_note: '' }])
-  const [entryPointId, setEntryPointId] = useState('')
-  const [scheduledDate, setScheduledDate] = useState('')
-  const [plannedStart, setPlannedStart] = useState('')
-  const [plannedEnd, setPlannedEnd] = useState('')
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(editTrip?.items.map((i) => i.asset_id) ?? []))
+  const [fromSite, setFromSite] = useState(editTrip?.from_site_id ?? '')
+  const [toSite, setToSite] = useState(editTrip?.to_site_id ?? '')
+  const [workers, setWorkers] = useState<Set<string>>(() => new Set(editTrip?.worker_ids ?? []))
+  const [vehiclesPicked, setVehiclesPicked] = useState<Set<string>>(() => new Set(editTrip?.vehicle_ids ?? []))
+  const [segments, setSegments] = useState<DraftSegment[]>(
+    editTrip && editTrip.route_segments.length > 0
+      ? editTrip.route_segments.map((s) => ({ route_id: s.route_id ?? '', checkpoint_note: s.checkpoint_note ?? '' }))
+      : [{ route_id: '', checkpoint_note: '' }],
+  )
+  const [entryPointId, setEntryPointId] = useState(editTrip?.planned_entry_point_id ?? '')
+  const [scheduledDate, setScheduledDate] = useState(editTrip?.scheduled_date ?? '')
+  const [plannedStart, setPlannedStart] = useState(editTrip?.planned_start_time?.slice(0, 5) ?? '')
+  const [plannedEnd, setPlannedEnd] = useState(editTrip?.planned_end_time?.slice(0, 5) ?? '')
   const [isReturn, setIsReturn] = useState(false)
   const [returnOf, setReturnOf] = useState('')
   const [linkable, setLinkable] = useState<LinkableTrip[]>([])
@@ -41,13 +51,13 @@ export default function Create() {
   const [toast, setToast] = useState('')
 
   // trip vs shift
-  const [mode, setMode] = useState<'trip' | 'duty'>('trip')
+  const [mode, setMode] = useState<'trip' | 'duty'>(editDuty ? 'duty' : 'trip')
   const [dutyTypes, setDutyTypes] = useState<DutyType[]>([])
-  const [dSite, setDSite] = useState('')
-  const [dType, setDType] = useState('')
-  const [dWorkers, setDWorkers] = useState<Set<string>>(new Set())
-  const [dStart, setDStart] = useState('')
-  const [dEnd, setDEnd] = useState('')
+  const [dSite, setDSite] = useState(editDuty?.site_id ?? '')
+  const [dType, setDType] = useState(editDuty?.duty_type_id ?? '')
+  const [dWorkers, setDWorkers] = useState<Set<string>>(() => new Set(editDuty?.worker_ids ?? []))
+  const [dStart, setDStart] = useState(editDuty ? toLocalInput(editDuty.start_time) : '')
+  const [dEnd, setDEnd] = useState(editDuty ? toLocalInput(editDuty.end_time) : '')
 
   const effectiveTo = toSite || (sitesById.has(DEFAULT_TO_SITE) ? DEFAULT_TO_SITE : '')
   const destEntryPoints = useMemo(
@@ -95,23 +105,26 @@ export default function Create() {
     if (!dStart || !dEnd) return setErr('יש למלא זמן התחלה וסיום')
     if (!token) return
     setSaving(true)
-    const { error } = await supabase.rpc('create_duty_shift', {
-      session_token: token,
-      site_id: dSite,
-      worker_ids: [...dWorkers],
-      duty_type_id: dType,
-      start_time: localToIso(dStart),
-      end_time: localToIso(dEnd),
-    })
+    const { error } = editDuty
+      ? await supabase.rpc('update_duty_shift', {
+          session_token: token, duty_shift_id: editDuty.id, site_id: dSite,
+          worker_ids: [...dWorkers], duty_type_id: dType,
+          start_time: localToIso(dStart), end_time: localToIso(dEnd),
+        })
+      : await supabase.rpc('create_duty_shift', {
+          session_token: token, site_id: dSite, worker_ids: [...dWorkers], duty_type_id: dType,
+          start_time: localToIso(dStart), end_time: localToIso(dEnd),
+        })
     setSaving(false)
     if (error) {
       if (error.message.includes('session')) return logout()
-      setErr(error.message)
+      setErr(translateEditErr(error.message))
       return
     }
+    void refresh()
+    if (editDuty) { onDone?.(); return }
     setDSite(''); setDType(''); setDWorkers(new Set()); setDStart(''); setDEnd('')
     setToast('נוצרה משמרת')
-    void refresh()
   }
 
   async function submit() {
@@ -128,26 +141,32 @@ export default function Create() {
       .map((s, i) => ({ sequence: i + 1, route_id: s.route_id, checkpoint_note: s.checkpoint_note.trim() || null }))
 
     setSaving(true)
-    const { error } = await supabase.rpc('create_trip', {
-      session_token: token,
-      from_site_id: fromSite,
-      to_site_id: effectiveTo,
-      worker_ids: [...workers],
-      vehicle_ids: [...vehiclesPicked],
-      route_segments: cleanSegments,
-      entry_point_id: entryPointId || null,
-      scheduled_date: scheduledDate,
-      planned_start_time: plannedStart || null,
-      planned_end_time: plannedEnd || null,
-      asset_ids: [...picked],
-      return_of_trip_id: isReturn ? returnOf : null,
-    })
+    const { error } = editTrip
+      ? await supabase.rpc('update_trip', {
+          session_token: token, trip_id: editTrip.id,
+          from_site_id: fromSite, to_site_id: effectiveTo,
+          worker_ids: [...workers], vehicle_ids: [...vehiclesPicked],
+          route_segments: cleanSegments, entry_point_id: entryPointId || null,
+          scheduled_date: scheduledDate, planned_start_time: plannedStart || null, planned_end_time: plannedEnd || null,
+          asset_ids: [...picked],
+        })
+      : await supabase.rpc('create_trip', {
+          session_token: token,
+          from_site_id: fromSite, to_site_id: effectiveTo,
+          worker_ids: [...workers], vehicle_ids: [...vehiclesPicked],
+          route_segments: cleanSegments, entry_point_id: entryPointId || null,
+          scheduled_date: scheduledDate, planned_start_time: plannedStart || null, planned_end_time: plannedEnd || null,
+          asset_ids: [...picked],
+          return_of_trip_id: isReturn ? returnOf : null,
+        })
     setSaving(false)
     if (error) {
       if (error.message.includes('session')) return logout()
-      setErr(error.message)
+      setErr(translateEditErr(error.message))
       return
     }
+    void refresh()
+    if (editTrip) { onDone?.(); return }
     setPicked(new Set())
     setWorkers(new Set())
     setVehiclesPicked(new Set())
@@ -159,19 +178,20 @@ export default function Create() {
     setIsReturn(false)
     setReturnOf('')
     setToast(`נוצרה נסיעה (${fromSite} ← ${effectiveTo})`)
-    void refresh()
   }
 
   return (
     <div>
-      <div className="segmented" style={{ marginBottom: 14 }}>
-        <button className={mode === 'trip' ? 'active' : ''} onClick={() => { setMode('trip'); setErr('') }}>🚚 נסיעה</button>
-        <button className={mode === 'duty' ? 'active' : ''} onClick={() => { setMode('duty'); setErr('') }}>🛡️ משמרת</button>
-      </div>
+      {!isEdit && (
+        <div className="segmented" style={{ marginBottom: 14 }}>
+          <button className={mode === 'trip' ? 'active' : ''} onClick={() => { setMode('trip'); setErr('') }}>🚚 נסיעה</button>
+          <button className={mode === 'duty' ? 'active' : ''} onClick={() => { setMode('duty'); setErr('') }}>🛡️ משמרת</button>
+        </div>
+      )}
 
       {mode === 'duty' && (
         <div className="card">
-          <h2>יצירת משמרת</h2>
+          <h2>{isEdit ? 'עריכת משמרת' : 'יצירת משמרת'}</h2>
           <label>אתר</label>
           <select value={dSite} onChange={(e) => setDSite(e.target.value)}>
             <option value="">— בחר —</option>
@@ -202,13 +222,16 @@ export default function Create() {
             </div>
           </div>
           {err && <div className="error-banner" style={{ marginTop: 12 }}>{err}</div>}
-          <button className="btn" onClick={() => void submitDuty()} disabled={saving}>{saving ? 'יוצר…' : 'צור משמרת'}</button>
+          <button className="btn" onClick={() => void submitDuty()} disabled={saving}>
+            {saving ? 'שומר…' : isEdit ? 'שמור שינויים' : 'צור משמרת'}
+          </button>
+          {isEdit && <button className="btn ghost" onClick={() => onDone?.()} disabled={saving}>ביטול</button>}
         </div>
       )}
 
       {mode === 'trip' && (
       <div className="card">
-        <h2>יצירת נסיעה</h2>
+        <h2>{isEdit ? 'עריכת נסיעה' : 'יצירת נסיעה'}</h2>
 
         <label>מוצרים בנסיעה (הגרלה משותפת אחת)</label>
         <div className="asset-pick">
@@ -296,26 +319,41 @@ export default function Create() {
           </div>
         </div>
 
-        <label className="inline-check" style={{ marginTop: 14 }}>
-          <input type="checkbox" checked={isReturn} onChange={(e) => setIsReturn(e.target.checked)} />
-          <span>זו נסיעת חזרה של נסיעה קיימת</span>
-        </label>
-        {isReturn && (
-          <select value={returnOf} onChange={(e) => setReturnOf(e.target.value)}>
-            <option value="">— בחר נסיעת הלוך —</option>
-            {linkable.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
-          </select>
+        {!isEdit && (
+          <>
+            <label className="inline-check" style={{ marginTop: 14 }}>
+              <input type="checkbox" checked={isReturn} onChange={(e) => setIsReturn(e.target.checked)} />
+              <span>זו נסיעת חזרה של נסיעה קיימת</span>
+            </label>
+            {isReturn && (
+              <select value={returnOf} onChange={(e) => setReturnOf(e.target.value)}>
+                <option value="">— בחר נסיעת הלוך —</option>
+                {linkable.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+              </select>
+            )}
+          </>
         )}
 
         {err && <div className="error-banner" style={{ marginTop: 12 }}>{err}</div>}
 
         <button className="btn" onClick={() => void submit()} disabled={saving}>
-          {saving ? 'יוצר…' : 'צור נסיעה'}
+          {saving ? 'שומר…' : isEdit ? 'שמור שינויים' : 'צור נסיעה'}
         </button>
+        {isEdit && <button className="btn ghost" onClick={() => onDone?.()} disabled={saving}>ביטול</button>}
       </div>
       )}
 
       {toast && <Toast message={toast} onDone={() => setToast('')} />}
     </div>
   )
+}
+
+function translateEditErr(msg: string): string {
+  if (msg.includes('not editable') || msg.includes('already started'))
+    return 'לא ניתן לערוך משימה שכבר התחילה'
+  if (msg.includes('at least one asset')) return 'יש לבחור לפחות מוצר אחד'
+  if (msg.includes('at least one worker')) return 'יש לבחור לפחות עובד אחד'
+  if (msg.includes('scheduled date')) return 'יש לבחור תאריך מתוכנן'
+  if (msg.includes('not found')) return 'המשימה לא נמצאה'
+  return msg
 }

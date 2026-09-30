@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../utils/supabase'
 import { fmtDateTime, toLocalInput, localToIso } from '../lib/ops'
 import type { ChecklistItem, DutyShift } from '../types'
+import type { EditTarget } from '../App'
 import DeleteAction from '../components/DeleteAction'
 
 const STATUS_HE: Record<DutyShift['status'], string> = {
@@ -14,12 +15,14 @@ const STATUS_HE: Record<DutyShift['status'], string> = {
 export default function DutyDetail({
   duty,
   onBack,
+  onEdit,
   onSaved,
   onCompleted,
   onDeleted,
 }: {
   duty: DutyShift
   onBack: () => void
+  onEdit: (t: EditTarget) => void
   onSaved: (msg?: string) => void
   onCompleted: () => void
   onDeleted: () => void
@@ -106,9 +109,14 @@ export default function DutyDetail({
       <div className="detail-topbar">
         <button className="btn secondary" onClick={onBack} style={{ marginTop: 0 }}>‹ חזרה לרשימה</button>
         {session?.role === 'admin' && (
-          <DeleteAction label={`משמרת ${duty.duty_type_label} · ${duty.site_id}`}
-            run={(reason, pin) => supabase.rpc('admin_delete_duty_shift', { session_token: token, actor_pin: pin, duty_shift_id: duty.id, reason })}
-            onDone={onDeleted} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            {duty.status === 'planned' && (
+              <button className="btn secondary" style={{ marginTop: 0 }} onClick={() => onEdit({ kind: 'duty', id: duty.id })}>ערוך</button>
+            )}
+            <DeleteAction label={`משמרת ${duty.duty_type_label} · ${duty.site_id}`}
+              run={(reason, pin) => supabase.rpc('admin_delete_duty_shift', { session_token: token, actor_pin: pin, duty_shift_id: duty.id, reason })}
+              onDone={onDeleted} />
+          </div>
         )}
       </div>
 
