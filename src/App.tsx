@@ -8,16 +8,24 @@ import Create from './screens/Create'
 import History from './screens/History'
 import AdminHub from './screens/AdminHub'
 
+export type EditTarget = { kind: 'trip' | 'duty'; id: string }
+
 function Shell() {
   const { session, logout } = useAuth()
   const { error } = useData()
   const [tab, setTab] = useState<Tab>('tasks')
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null)
 
   if (!session) return <Login />
 
   // Operators can't reach admin-only screens.
   const adminOnly: Tab[] = ['create', 'admin']
   const activeTab: Tab = adminOnly.includes(tab) && session.role !== 'admin' ? 'tasks' : tab
+
+  // open the create form pre-filled to edit a planned task
+  const startEdit = (t: EditTarget) => { setEditTarget(t); setTab('create') }
+  // manual navigation always leaves edit mode
+  const navigate = (t: Tab) => { setEditTarget(null); setTab(t) }
 
   return (
     <>
@@ -36,12 +44,14 @@ function Shell() {
 
         {error && <div className="error-banner">שגיאת חיבור: {error}</div>}
 
-        {activeTab === 'tasks' && <Tasks />}
-        {activeTab === 'create' && <Create />}
+        {activeTab === 'tasks' && <Tasks onEdit={startEdit} />}
+        {activeTab === 'create' && (
+          <Create editTarget={editTarget} onDone={() => navigate('tasks')} />
+        )}
         {activeTab === 'history' && <History />}
         {activeTab === 'admin' && <AdminHub />}
       </div>
-      <BottomNav tab={activeTab} role={session.role} onChange={setTab} />
+      <BottomNav tab={activeTab} role={session.role} onChange={navigate} />
     </>
   )
 }

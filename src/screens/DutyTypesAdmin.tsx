@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../utils/supabase'
 import type { ChecklistTemplate, DutyType } from '../types'
 import Toast from '../components/Toast'
+import DeleteAction from '../components/DeleteAction'
 
 export default function DutyTypesAdmin() {
   const { token, logout } = useAuth()
@@ -85,6 +86,9 @@ export default function DutyTypesAdmin() {
                 {t.is_active ? 'לארכיון' : 'שחזר'}
               </button>
               <button className="btn sm" onClick={() => void save(t)}>שמור</button>
+              <DeleteAction label={`סוג משמרת "${t.label}"`} small
+                run={(reason, pin) => supabase.rpc('admin_delete_duty_type', { session_token: token, actor_pin: pin, id: t.id, reason })}
+                onDone={() => void load()} />
             </div>
           </div>
         ))}

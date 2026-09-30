@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { supabase } from '../utils/supabase'
-import { siteKindHe } from '../lib/ops'
+import { siteLabel } from '../lib/ops'
 import type { DutySummary as DutySummaryT } from '../types'
 
 function isoLocal(d: Date): string {
@@ -32,7 +32,7 @@ function Bars({ title, items, total }: { title: string; items: { key: string; co
 
 export default function DutySummary() {
   const { token, logout } = useAuth()
-  const { sites } = useData()
+  const { sites, siteTypesById } = useData()
   const activeSites = useMemo(() => sites.filter((s) => s.is_active !== false), [sites])
 
   const [siteId, setSiteId] = useState('')
@@ -73,7 +73,7 @@ export default function DutySummary() {
         <label>אתר</label>
         <select value={effectiveSite} onChange={(e) => setSiteId(e.target.value)}>
           {activeSites.length === 0 && <option value="">אין אתרים</option>}
-          {activeSites.map((s) => <option key={s.id} value={s.id}>{s.id} · {siteKindHe(s.kind)}</option>)}
+          {activeSites.map((s) => <option key={s.id} value={s.id}>{siteLabel(s, s.id, siteTypesById)}</option>)}
         </select>
         <label>תקופה</label>
         <div className="segmented">

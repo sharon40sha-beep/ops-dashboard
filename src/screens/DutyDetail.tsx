@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { useData } from '../context/DataContext'
 import { supabase } from '../utils/supabase'
 import { fmtDateTime, toLocalInput, localToIso } from '../lib/ops'
 import type { ChecklistItem, DutyShift } from '../types'
+import type { EditTarget } from '../App'
+import DeleteAction from '../components/DeleteAction'
 
 const STATUS_HE: Record<DutyShift['status'], string> = {
   planned: 'מתוכננת',
@@ -14,17 +15,20 @@ const STATUS_HE: Record<DutyShift['status'], string> = {
 export default function DutyDetail({
   duty,
   onBack,
+  onEdit,
   onSaved,
   onCompleted,
+  onDeleted,
 }: {
   duty: DutyShift
   onBack: () => void
+  onEdit: (t: EditTarget) => void
   onSaved: (msg?: string) => void
   onCompleted: () => void
+  onDeleted: () => void
 }) {
-  const { token, logout } = useAuth()
-  const { employees } = useData()
-  const workerName = useMemo(() => employees.find((e) => e.id === duty.worker_id)?.name, [employees, duty.worker_id])
+  const { token, session, logout } = useAuth()
+  const workerNames = useMemo(() => duty.workers.map((w) => w.name).join(', '), [duty.workers])
 
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -102,7 +106,19 @@ export default function DutyDetail({
 
   return (
     <div>
-      <button className="btn secondary" onClick={onBack} style={{ marginTop: 0 }}>‹ חזרה לרשימה</button>
+      <div className="detail-topbar">
+        <button className="btn secondary" onClick={onBack} style={{ marginTop: 0 }}>‹ חזרה לרשימה</button>
+        {session?.role === 'admin' && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            {duty.status === 'planned' && (
+              <button className="btn secondary" style={{ marginTop: 0 }} onClick={() => onEdit({ kind: 'duty', id: duty.id })}>ערוך</button>
+            )}
+            <DeleteAction label={`משמרת ${duty.duty_type_label} · ${duty.site_id}`}
+              run={(reason, pin) => supabase.rpc('admin_delete_duty_shift', { session_token: token, actor_pin: pin, duty_shift_id: duty.id, reason })}
+              onDone={onDeleted} />
+          </div>
+        )}
+      </div>
 
       <div className="card" style={{ marginTop: 14 }}>
         <div className="task-card-top">
@@ -113,7 +129,7 @@ export default function DutyDetail({
         <div className="task-card-meta">
           <span>מ־{fmtDateTime(duty.start_time)}</span>
           <span>עד {fmtDateTime(duty.end_time)}</span>
-          {workerName && <span>עובד: {workerName}</span>}
+          {workerNames && <span>עובדים: {workerNames}</span>}
         </div>
       </div>
 
