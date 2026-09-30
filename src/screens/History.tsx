@@ -2,21 +2,22 @@ import { useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { supabase } from '../utils/supabase'
-import { fmtDateTime, siteKindHe } from '../lib/ops'
+import { fmtDateTime, siteLabel } from '../lib/ops'
 import DeleteAction from '../components/DeleteAction'
-import type { DutyShift, Trip } from '../types'
+import type { DutyShift, RouteSegment, Trip } from '../types'
+
+function routesText(segs: { route_id: string | null }[] | undefined): string {
+  const r = (segs ?? []).map((s) => s.route_id).filter(Boolean)
+  return r.length ? r.join(' → ') : '—'
+}
 
 export default function History() {
   const { session, token, logout } = useAuth()
-  const { history, trips, dutyHistory, sitesById, employees, refresh } = useData()
+  const { history, trips, dutyHistory, sitesById, siteTypesById, entryPoints, refresh } = useData()
   const isAdmin = session?.role === 'admin'
   const [openLog, setOpenLog] = useState<string | null>(null)
 
-  const nameById = useMemo(() => {
-    const m = new Map<string, string>()
-    employees.forEach((e) => m.set(e.id, e.name))
-    return m
-  }, [employees])
+  const entryLabelById = useMemo(() => new Map(entryPoints.map((e) => [e.id, e.label])), [entryPoints])
 
   const allTrips = useMemo(() => [...history, ...trips], [history, trips])
   const labelById = useMemo(() => {
@@ -37,8 +38,10 @@ export default function History() {
   }, [history, dutyHistory])
 
   function siteText(id: string): string {
-    const kind = sitesById.get(id)?.kind
-    return kind ? `${id} · ${siteKindHe(kind)}` : id
+    return siteLabel(sitesById.get(id), id, siteTypesById)
+  }
+  function entryText(id: string | null | undefined): string {
+    return id ? (entryLabelById.get(id) ?? '—') : '—'
   }
 
   async function setTripExcl(id: string, excluded: boolean, reason: string) {
@@ -66,8 +69,16 @@ export default function History() {
 
   function renderTrip(t: Trip) {
     const a = t.actual
-    const vDiff = a ? (a.vehicle ?? '').trim() !== (t.vehicle_id ?? '').trim() : false
-    const rDiff = a ? (a.route ?? '').trim() !== (t.route_id ?? '').trim() : false
+    const actualSegs: RouteSegment[] = a?.segments ?? []
+    const plannedRoute = routesText(t.route_segments)
+    const actualRoute = routesText(actualSegs)
+    const rDiff = a ? plannedRoute !== actualRoute : false
+    const plannedVeh = t.vehicle_ids.join(', ') || '—'
+    const actualVeh = (a?.vehicles ?? []).join(', ') || '—'
+    const vDiff = a ? plannedVeh !== actualVeh : false
+    const plannedEntry = entryText(t.planned_entry_point_id)
+    const actualEntry = entryText(a?.entry_point_id)
+    const eDiff = a ? plannedEntry !== actualEntry : false
     const logOpen = openLog === t.id
     const ret = returnByOutbound.get(t.id)
     return (
@@ -87,12 +98,21 @@ export default function History() {
         <div className="pa-grid">
           <div className="pa-head">מתוכנן</div>
           <div className="pa-head">בפועל</div>
-          <div className="pa-cell">רכב: <span className="code sm">{t.vehicle_id || '—'}</span></div>
-          <div className={`pa-cell ${vDiff ? 'diff' : ''}`}>רכב: <span className="code sm">{a?.vehicle || '—'}</span></div>
-          <div className="pa-cell">ציר: <strong>{t.route_id || '—'}</strong></div>
-          <div className={`pa-cell ${rDiff ? 'diff' : ''}`}>ציר: <strong>{a?.route || '—'}</strong></div>
+          <div className="pa-cell">ציר: <strong>{plannedRoute}</strong></div>
+          <div className={`pa-cell ${rDiff ? 'diff' : ''}`}>ציר: <strong>{actualRoute}</strong></div>
+          <div className="pa-cell">רכב: <span className="code sm">{plannedVeh}</span></div>
+          <div className={`pa-cell ${vDiff ? 'diff' : ''}`}>רכב: <span className="code sm">{actualVeh}</span></div>
+          <div className="pa-cell">שער: {plannedEntry}</div>
+          <div className={`pa-cell ${eDiff ? 'diff' : ''}`}>שער: {actualEntry}</div>
         </div>
         {a?.deviated && <div className="reason-box"><strong>סיבת סטייה:</strong> {a.reason || '—'}</div>}
+        {actualSegs.some((s) => s.checkpoint_note) && (
+          <div className="notes-box">
+            {actualSegs.filter((s) => s.checkpoint_note).map((s, i) => (
+              <div key={i}><strong>{s.route_id}</strong> — {s.checkpoint_note}</div>
+            ))}
+          </div>
+        )}
         {t.return_of_trip_id && <div className="link-box">↔ חזרה של: {labelById.get(t.return_of_trip_id) ?? 'נסיעה'}</div>}
         {ret && <div className="link-box">↔ נסיעת חזרה: {labelById.get(ret.id) ?? 'נסיעה'}</div>}
         {t.items.some((it) => it.checklist_note) && (
@@ -115,7 +135,7 @@ export default function History() {
         {!isAdmin && t.excluded_from_analysis && <div className="excl-tag">לא נכלל בניתוח</div>}
 
         <div className="hist-foot">
-          <span className="muted">עובד: {nameById.get(t.worker_id) ?? 'לא ידוע'}</span>
+          <span className="muted">עובדים: {t.workers.map((w) => w.name).join(', ') || 'לא ידוע'}</span>
           <button className="log-toggle" onClick={() => setOpenLog(logOpen ? null : t.id)}>
             {logOpen ? '▾' : '▸'} audit log ({t.audit_log.length})
           </button>
@@ -153,7 +173,7 @@ export default function History() {
         {!isAdmin && d.excluded_from_analysis && <div className="excl-tag">לא נכלל בניתוח</div>}
 
         <div className="hist-foot">
-          <span className="muted">עובד: {nameById.get(d.worker_id) ?? 'לא ידוע'}</span>
+          <span className="muted">עובדים: {d.workers.map((w) => w.name).join(', ') || 'לא ידוע'}</span>
           <button className="log-toggle" onClick={() => setOpenLog(logOpen ? null : d.id)}>
             {logOpen ? '▾' : '▸'} audit log ({d.audit_log.length})
           </button>

@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { useData } from '../context/DataContext'
 import { supabase } from '../utils/supabase'
 import { fmtDateTime, toLocalInput, localToIso } from '../lib/ops'
 import type { ChecklistItem, DutyShift } from '../types'
@@ -26,8 +25,7 @@ export default function DutyDetail({
   onDeleted: () => void
 }) {
   const { token, session, logout } = useAuth()
-  const { employees } = useData()
-  const workerName = useMemo(() => employees.find((e) => e.id === duty.worker_id)?.name, [employees, duty.worker_id])
+  const workerNames = useMemo(() => duty.workers.map((w) => w.name).join(', '), [duty.workers])
 
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -123,7 +121,7 @@ export default function DutyDetail({
         <div className="task-card-meta">
           <span>מ־{fmtDateTime(duty.start_time)}</span>
           <span>עד {fmtDateTime(duty.end_time)}</span>
-          {workerName && <span>עובד: {workerName}</span>}
+          {workerNames && <span>עובדים: {workerNames}</span>}
         </div>
       </div>
 

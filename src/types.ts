@@ -1,5 +1,4 @@
 export type Role = 'admin' | 'operator'
-export type SiteKind = 'warehouse' | 'factory' | 'other'
 export type TaskStatus = 'planned' | 'active' | 'completed'
 
 /**
@@ -34,8 +33,30 @@ export interface LoginAttempt {
 
 export interface Site {
   id: string // 'S01'..'S06' warehouses, 'S07' factory, extendable
-  kind: SiteKind
+  site_type_id: string | null // -> site_types.id (managed; replaces the old fixed kind)
   is_active?: boolean
+}
+
+/** A managed site type (מחסן / מפעל / …). Replaces the old fixed SiteKind enum. */
+export interface SiteType {
+  id: string
+  label: string
+  is_active: boolean
+}
+
+/** A named gate/entry point at a site (e.g. "כניסת אבנים"). */
+export interface SiteEntryPoint {
+  id: string
+  site_id: string
+  label: string
+  is_active: boolean
+}
+
+/** One ordered leg of a trip's planned route. */
+export interface RouteSegment {
+  sequence: number
+  route_id: string | null
+  checkpoint_note: string | null
 }
 
 export interface Asset {
@@ -61,24 +82,43 @@ export interface TripItem {
   checklist_note: string | null
 }
 
+/** A lightweight {id,name} worker reference embedded in trips/shifts. */
+export interface WorkerRef {
+  id: string
+  name: string
+}
+
 /** A trip = one real movement carrying one or more assets. */
 export interface Trip {
   id: string
   from_site_id: string
   to_site_id: string
-  worker_id: string
-  vehicle_id: string | null
-  route_id: string | null
+  worker_ids: string[]
+  workers: WorkerRef[]
+  vehicle_ids: string[]
+  route_segments: RouteSegment[]
+  planned_entry_point_id: string | null
+  entry_point: string | null // label of the planned entry point (join)
   time_window: string
   status: TaskStatus
   return_of_trip_id: string | null
-  actual: TaskActual | null
+  actual: TripActual | null
   audit_log: string[]
   started_at: string | null
   created_at: string
   excluded_from_analysis?: boolean
   excluded_reason?: string | null
   items: TripItem[]
+}
+
+/** Trip "actual" (in-practice) report, stored in trips.actual (jsonb). */
+export interface TripActual {
+  segments: RouteSegment[]
+  entry_point_id: string | null
+  vehicles: string[]
+  completed_at: string
+  deviated: boolean
+  reason: string
 }
 
 export interface LinkableTrip {
@@ -105,7 +145,8 @@ export interface DutyActual {
 export interface DutyShift {
   id: string
   site_id: string
-  worker_id: string
+  worker_ids: string[]
+  workers: WorkerRef[]
   duty_type_id: string
   duty_type_label: string
   start_time: string

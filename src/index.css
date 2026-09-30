@@ -996,3 +996,43 @@ textarea:focus {
   min-width: 140px;
   margin: 0;
 }
+
+/* ---------- Route-segment editor (migration 0014) ---------- */
+.seg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.seg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.seg-row select {
+  margin: 0;
+  flex: 0 0 auto;
+  min-width: 90px;
+}
+.seg-row input {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+.seg-row .btn.sm {
+  width: auto;
+  margin-top: 0;
+  flex: 0 0 auto;
+}
+.seg-num {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--card-2);
+  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}

@@ -1,4 +1,4 @@
-import type { ChecklistItem, Site, SiteKind } from '../types'
+import type { ChecklistItem, Site } from '../types'
 
 // ---------------------------------------------------------------------------
 // Fixed defaults
@@ -24,18 +24,16 @@ export const DEFAULT_TO_SITE = 'S07'
 // Site helpers
 // ---------------------------------------------------------------------------
 
-const KIND_HE: Record<SiteKind, string> = {
-  warehouse: 'מחסן',
-  factory: 'מפעל',
-  other: 'מתקן',
+/** Human label of a site's type (managed via site_types), '' if none/unknown. */
+export function siteTypeLabel(site: Site | undefined, typesById: Map<string, string>): string {
+  if (!site?.site_type_id) return ''
+  return typesById.get(site.site_type_id) ?? ''
 }
 
-export function siteKindHe(kind: SiteKind | undefined): string {
-  return kind ? KIND_HE[kind] : ''
-}
-
-export function siteKindOf(sites: Map<string, Site>, id: string): SiteKind | undefined {
-  return sites.get(id)?.kind
+/** "S01 · מחסן" (or just "S01" when the type is unknown). */
+export function siteLabel(site: Site | undefined, id: string, typesById: Map<string, string>): string {
+  const t = siteTypeLabel(site, typesById)
+  return t ? `${id} · ${t}` : id
 }
 
 // ---------------------------------------------------------------------------
