@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { supabase } from '../utils/supabase'
+import DutySummary from './DutySummary'
 import type { AssetSummary, JointPair } from '../types'
 
 function isoLocal(d: Date): string {
@@ -41,6 +42,7 @@ export default function Summary() {
   const { assets } = useData()
   const activeAssets = useMemo(() => assets.filter((a) => a.is_active !== false), [assets])
 
+  const [view, setView] = useState<'trips' | 'duties'>('trips')
   const [assetId, setAssetId] = useState('')
   const [period, setPeriod] = useState<Period>('30')
   const [from, setFrom] = useState(isoLocal(new Date(Date.now() - 30 * 864e5)))
@@ -100,6 +102,13 @@ export default function Summary() {
 
   return (
     <div>
+      <div className="segmented" style={{ marginBottom: 14 }}>
+        <button className={view === 'trips' ? 'active' : ''} onClick={() => setView('trips')}>🚚 מוצרים (נסיעות)</button>
+        <button className={view === 'duties' ? 'active' : ''} onClick={() => setView('duties')}>🛡️ אתרים (משמרות)</button>
+      </div>
+
+      {view === 'duties' ? <DutySummary /> : (
+      <>
       <div className="card">
         <h2>לוח למידה — לפי מוצר</h2>
         <label>מוצר</label>
@@ -180,6 +189,8 @@ export default function Summary() {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   )
 }
