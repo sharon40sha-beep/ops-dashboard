@@ -98,6 +98,7 @@ export interface Trip {
   route_segments: RouteSegment[]
   planned_entry_point_id: string | null
   entry_point: string | null // label of the planned entry point (join)
+  label: string | null // free display tag the admin writes (not a real detail)
   scheduled_date: string // 'YYYY-MM-DD' — REQUIRED, the planned day
   planned_start_time: string | null // 'HH:MM[:SS]' — optional guidance only
   planned_end_time: string | null
@@ -128,6 +129,15 @@ export interface LinkableTrip {
   label: string
 }
 
+/** One minimal row in the weekly preview (list_my_week / list_week_for_employee). */
+export interface WeekItem {
+  id: string
+  scheduled_date: string
+  label: string | null
+  type: 'trip' | 'duty'
+  status: TaskStatus
+}
+
 // ---- duties (E) ----
 export interface DutyType {
   id: string
@@ -147,6 +157,7 @@ export interface DutyActual {
 export interface DutyShift {
   id: string
   site_id: string
+  label: string | null // free display tag the admin writes
   worker_ids: string[]
   workers: WorkerRef[]
   duty_type_id: string

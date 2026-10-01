@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { DataProvider, useData } from './context/DataContext'
 import BottomNav, { type Tab } from './components/BottomNav'
 import Login from './screens/Login'
+import MyWeek from './screens/MyWeek'
 import Tasks from './screens/Tasks'
 import Create from './screens/Create'
 import History from './screens/History'
@@ -13,8 +14,9 @@ export type EditTarget = { kind: 'trip' | 'duty'; id: string }
 function Shell() {
   const { session, logout } = useAuth()
   const { error } = useData()
-  const [tab, setTab] = useState<Tab>('tasks')
+  const [tab, setTab] = useState<Tab>('week')
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null)
+  const [openTask, setOpenTask] = useState<EditTarget | null>(null)
 
   if (!session) return <Login />
 
@@ -24,8 +26,10 @@ function Shell() {
 
   // open the create form pre-filled to edit a planned task
   const startEdit = (t: EditTarget) => { setEditTarget(t); setTab('create') }
-  // manual navigation always leaves edit mode
-  const navigate = (t: Tab) => { setEditTarget(null); setTab(t) }
+  // open a task's full detail from the weekly preview
+  const openTaskDetail = (t: EditTarget) => { setOpenTask(t); setTab('tasks') }
+  // manual navigation always leaves edit / open-target mode
+  const navigate = (t: Tab) => { setEditTarget(null); setOpenTask(null); setTab(t) }
 
   return (
     <>
@@ -44,7 +48,8 @@ function Shell() {
 
         {error && <div className="error-banner">שגיאת חיבור: {error}</div>}
 
-        {activeTab === 'tasks' && <Tasks onEdit={startEdit} />}
+        {activeTab === 'week' && <MyWeek onOpen={openTaskDetail} />}
+        {activeTab === 'tasks' && <Tasks onEdit={startEdit} openTarget={openTask} />}
         {activeTab === 'create' && (
           <Create editTarget={editTarget} onDone={() => navigate('tasks')} />
         )}
