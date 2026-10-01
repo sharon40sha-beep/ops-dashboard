@@ -5,15 +5,22 @@ import ChecklistAdmin from './ChecklistAdmin'
 import Entities from './Entities'
 import Summary from './Summary'
 import DutyTypesAdmin from './DutyTypesAdmin'
+import RouteTemplatesAdmin from './RouteTemplatesAdmin'
+import DutySlotsAdmin from './DutySlotsAdmin'
+import AssetGenAdmin from './AssetGenAdmin'
 import DeletionLog from './DeletionLog'
 
-type Sub = 'menu' | 'employees' | 'attempts' | 'checklist' | 'entities' | 'summary' | 'dutytypes' | 'deletions'
+type Sub = 'menu' | 'employees' | 'attempts' | 'checklist' | 'entities' | 'summary' | 'dutytypes'
+  | 'routetpls' | 'dutyslots' | 'assetgen' | 'deletions'
 
 const ITEMS: { id: Exclude<Sub, 'menu'>; label: string; icon: string; desc: string }[] = [
   { id: 'employees', label: 'עובדים', icon: '👤', desc: 'הוספה, סיסמאות, הרשאות, השבתה' },
   { id: 'entities', label: 'הגדרות מערכת', icon: '🏭', desc: 'מוצרים, אתרים, צירים, רכבים' },
   { id: 'checklist', label: 'תוכן צ׳קליסט', icon: '☑️', desc: 'תבניות וסעיפי בדיקה' },
   { id: 'dutytypes', label: 'סוגי משמרת', icon: '🛡️', desc: 'הגדרת סוגי משמרת סטטית' },
+  { id: 'routetpls', label: 'תבניות מסלול', icon: '🗺️', desc: 'מסלולים קבועים להגרלה' },
+  { id: 'assetgen', label: 'הגדרות הגרלה', icon: '🎲', desc: 'ימים/כשירות/מסלולים לכל מוצר' },
+  { id: 'dutyslots', label: 'סלוטים קבועים', icon: '🗓️', desc: 'משמרות קבועות להגרלה' },
   { id: 'summary', label: 'לוח למידה', icon: '📊', desc: 'נסיעות (מוצר) + משמרות (אתר)' },
   { id: 'attempts', label: 'לוג כניסות', icon: '🔐', desc: 'ניסיונות התחברות אחרונים' },
   { id: 'deletions', label: 'יומן מחיקות', icon: '🗑️', desc: 'תיעוד קבוע של כל מחיקה' },
@@ -50,6 +57,9 @@ export default function AdminHub() {
       {sub === 'entities' && <Entities />}
       {sub === 'summary' && <Summary />}
       {sub === 'dutytypes' && <DutyTypesAdmin />}
+      {sub === 'routetpls' && <RouteTemplatesAdmin />}
+      {sub === 'assetgen' && <AssetGenAdmin />}
+      {sub === 'dutyslots' && <DutySlotsAdmin />}
       {sub === 'deletions' && <DeletionLog />}
     </div>
   )
