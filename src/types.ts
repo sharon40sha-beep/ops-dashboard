@@ -129,6 +129,48 @@ export interface LinkableTrip {
   label: string
 }
 
+/** A reusable route template (0020). */
+export interface RouteTemplate {
+  id: string
+  name: string
+  entry_point_id: string | null
+  is_active: boolean
+  segments: RouteSegment[]
+}
+
+/** A fixed recurring duty slot definition (0020). */
+export interface DutySlot {
+  id: string
+  site_id: string
+  duty_type_id: string
+  label: string | null
+  start_time: string
+  end_time: string
+  weekdays: number[]
+  worker_count: number
+  is_active: boolean
+  eligible_worker_ids: string[]
+}
+
+/** Per-asset generation config (admin_list_asset_gen). */
+export interface AssetGenConfig {
+  id: string
+  gen_worker_count: number
+  gen_vehicle_count: number
+  weekdays: number[]
+  eligible_worker_ids: string[]
+  eligible_vehicle_ids: string[]
+  route_template_ids: string[]
+}
+
+/** Result of admin_generate_week. */
+export interface WeekGenResult {
+  trips_created: number
+  duties_created: number
+  skipped_assets: string[]
+  note: string
+}
+
 /** One minimal row in the weekly preview (list_my_week / list_week_for_employee). */
 export interface WeekItem {
   id: string

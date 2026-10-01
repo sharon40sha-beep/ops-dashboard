@@ -43,6 +43,9 @@ export default function DutyDetail({
   const [actualEnd, setActualEnd] = useState(toLocalInput(duty.end_time))
   const [anomaly, setAnomaly] = useState(false)
   const [anomalyNotes, setAnomalyNotes] = useState('')
+  const [subReason, setSubReason] = useState('')
+  // worker flexibility: reason needed if whoever completes wasn't planned on this shift
+  const workerDev = !!session && !duty.worker_ids.includes(session.employeeId)
 
   const hasUnchecked = checklist.some((c) => !c.checked)
   const canStart = !busy && (!hasUnchecked || note.trim() !== '')
@@ -84,6 +87,10 @@ export default function DutyDetail({
       setErr('סומן "נמצא חריג" — חובה למלא פירוט.')
       return
     }
+    if (workerDev && subReason.trim() === '') {
+      setErr('מי שמסיים אינו מי שתוכנן — חובה למלא סיבה.')
+      return
+    }
     setErr(''); setBusy(true)
     const { error } = await supabase.rpc('complete_duty', {
       session_token: token,
@@ -93,6 +100,8 @@ export default function DutyDetail({
         actual_end: localToIso(actualEnd),
         anomaly_found: anomaly,
         anomaly_notes: anomalyNotes.trim(),
+        actual_worker_id: session?.employeeId ?? null,
+        reason: subReason.trim(),
       },
     })
     setBusy(false)
@@ -169,6 +178,12 @@ export default function DutyDetail({
               <input type="datetime-local" value={actualStart} onChange={(e) => setActualStart(e.target.value)} />
               <label>סיום בפועל</label>
               <input type="datetime-local" value={actualEnd} onChange={(e) => setActualEnd(e.target.value)} />
+              {workerDev && (
+                <>
+                  <label>לא תוכננת למשמרת זו — סיבה לביצוע במקום *</label>
+                  <input type="text" value={subReason} onChange={(e) => setSubReason(e.target.value)} placeholder="מדוע את/ה מבצע/ת במקום מי שתוכנן?" />
+                </>
+              )}
               <label className="inline-check" style={{ marginTop: 12 }}>
                 <input type="checkbox" checked={anomaly} onChange={(e) => setAnomaly(e.target.checked)} />
                 <span>נמצא חריג</span>

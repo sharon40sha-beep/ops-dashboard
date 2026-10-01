@@ -205,7 +205,9 @@ function TripDetail({
   const routesDiff = JSON.stringify(plannedRoutes) !== JSON.stringify(actualRoutes)
   const vehDiff = JSON.stringify([...trip.vehicle_ids].sort()) !== JSON.stringify([...aVehicles].sort())
   const entryDiff = (trip.planned_entry_point_id ?? '') !== (aEntry ?? '')
-  const deviated = routesDiff || vehDiff || entryDiff
+  // worker flexibility: whoever completes is the actual performer; reason needed if not planned
+  const workerDev = !!session && !trip.worker_ids.includes(session.employeeId)
+  const deviated = routesDiff || vehDiff || entryDiff || workerDev
 
   const canStart = !busy && items.every((it) => !it.checklist.some((c) => !c.checked) || it.note.trim() !== '')
 
@@ -272,6 +274,7 @@ function TripDetail({
           .map((s) => ({ route_id: s.route_id, checkpoint_note: s.checkpoint_note.trim() || null })),
         vehicles: [...aVehicles],
         entry_point_id: aEntry || null,
+        actual_worker_id: session?.employeeId ?? null,
         reason: reason.trim(),
       },
     })
