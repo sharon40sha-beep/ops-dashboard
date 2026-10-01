@@ -5,18 +5,16 @@ import ChecklistAdmin from './ChecklistAdmin'
 import Entities from './Entities'
 import Summary from './Summary'
 import DutyTypesAdmin from './DutyTypesAdmin'
-import DutySummary from './DutySummary'
 import DeletionLog from './DeletionLog'
 
-type Sub = 'menu' | 'employees' | 'attempts' | 'checklist' | 'entities' | 'summary' | 'dutytypes' | 'dutysummary' | 'deletions'
+type Sub = 'menu' | 'employees' | 'attempts' | 'checklist' | 'entities' | 'summary' | 'dutytypes' | 'deletions'
 
 const ITEMS: { id: Exclude<Sub, 'menu'>; label: string; icon: string; desc: string }[] = [
   { id: 'employees', label: 'עובדים', icon: '👤', desc: 'הוספה, סיסמאות, הרשאות, השבתה' },
   { id: 'entities', label: 'הגדרות מערכת', icon: '🏭', desc: 'מוצרים, אתרים, צירים, רכבים' },
   { id: 'checklist', label: 'תוכן צ׳קליסט', icon: '☑️', desc: 'תבניות וסעיפי בדיקה' },
   { id: 'dutytypes', label: 'סוגי משמרת', icon: '🛡️', desc: 'הגדרת סוגי משמרת סטטית' },
-  { id: 'summary', label: 'לוח למידה', icon: '📊', desc: 'סיכום מוצר + תנועה משותפת' },
-  { id: 'dutysummary', label: 'סיכום משמרות', icon: '📋', desc: 'ניתוח משמרות לפי אתר' },
+  { id: 'summary', label: 'לוח למידה', icon: '📊', desc: 'נסיעות (מוצר) + משמרות (אתר)' },
   { id: 'attempts', label: 'לוג כניסות', icon: '🔐', desc: 'ניסיונות התחברות אחרונים' },
   { id: 'deletions', label: 'יומן מחיקות', icon: '🗑️', desc: 'תיעוד קבוע של כל מחיקה' },
 ]
@@ -52,7 +50,6 @@ export default function AdminHub() {
       {sub === 'entities' && <Entities />}
       {sub === 'summary' && <Summary />}
       {sub === 'dutytypes' && <DutyTypesAdmin />}
-      {sub === 'dutysummary' && <DutySummary />}
       {sub === 'deletions' && <DeletionLog />}
     </div>
   )
