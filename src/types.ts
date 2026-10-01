@@ -142,7 +142,7 @@ export interface WeekItem {
 export interface DutyType {
   id: string
   label: string
-  checklist_template_id: string | null
+  template_ids: string[] // linked checklist templates (shared pool, m:n)
   is_active: boolean
 }
 
@@ -158,6 +158,7 @@ export interface DutyShift {
   id: string
   site_id: string
   label: string | null // free display tag the admin writes
+  checklist_template_id?: string | null // the template chosen for this shift
   worker_ids: string[]
   workers: WorkerRef[]
   duty_type_id: string
