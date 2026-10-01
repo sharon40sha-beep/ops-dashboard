@@ -46,7 +46,7 @@ drop function if exists public.admin_list_duty_types(text);
 drop function if exists public.admin_add_duty_type(text, text, uuid);
 drop function if exists public.admin_update_duty_type(text, uuid, text, uuid, boolean);
 
-create function public.admin_list_duty_types(session_token text)
+create or replace function public.admin_list_duty_types(session_token text)
 returns table (id uuid, label text, is_active boolean, template_ids uuid[])
 language plpgsql stable security definer set search_path = public
 as $$
@@ -60,7 +60,7 @@ begin
 end;
 $$;
 
-create function public.admin_add_duty_type(session_token text, label text, template_ids uuid[])
+create or replace function public.admin_add_duty_type(session_token text, label text, template_ids uuid[])
 returns void language plpgsql volatile security definer set search_path = public
 as $$
 declare v_id uuid; v_t uuid;
@@ -77,7 +77,7 @@ begin
 end;
 $$;
 
-create function public.admin_update_duty_type(session_token text, id uuid, label text, is_active boolean)
+create or replace function public.admin_update_duty_type(session_token text, id uuid, label text, is_active boolean)
 returns void language plpgsql volatile security definer set search_path = public
 as $$
 begin
@@ -116,7 +116,7 @@ $$;
 drop function if exists public.create_duty_shift(text, text, uuid[], uuid, timestamptz, timestamptz, text);
 drop function if exists public.update_duty_shift(text, uuid, text, uuid[], uuid, timestamptz, timestamptz, text);
 
-create function public.create_duty_shift(
+create or replace function public.create_duty_shift(
   session_token text, site_id text, worker_ids uuid[], duty_type_id uuid,
   start_time timestamptz, end_time timestamptz, p_label text, p_template_id uuid)
 returns jsonb language plpgsql volatile security definer set search_path = public
@@ -147,7 +147,7 @@ begin
 end;
 $$;
 
-create function public.update_duty_shift(
+create or replace function public.update_duty_shift(
   session_token text, duty_shift_id uuid, site_id text, worker_ids uuid[], duty_type_id uuid,
   start_time timestamptz, end_time timestamptz, p_label text, p_template_id uuid)
 returns jsonb language plpgsql volatile security definer set search_path = public
