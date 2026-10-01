@@ -49,9 +49,9 @@ const STATUS_HE: Record<Trip['status'], string> = {
   completed: 'הושלמה',
 }
 
-export default function Tasks({ onEdit }: { onEdit: (t: EditTarget) => void }) {
+export default function Tasks({ onEdit, openTarget }: { onEdit: (t: EditTarget) => void; openTarget?: EditTarget | null }) {
   const { trips, duties, loading, refresh } = useData()
-  const [open, setOpen] = useState<{ kind: 'trip' | 'duty'; id: string } | null>(null)
+  const [open, setOpen] = useState<{ kind: 'trip' | 'duty'; id: string } | null>(openTarget ?? null)
   const [toast, setToast] = useState('')
 
   // trips + duty shifts merged into one time-sorted feed
@@ -114,6 +114,7 @@ export default function Tasks({ onEdit }: { onEdit: (t: EditTarget) => void }) {
                   </span>
                   <span className={`status-pill status-${r.trip.status}`}>{STATUS_HE[r.trip.status]}</span>
                 </div>
+                {r.trip.label && <div className="task-label">{r.trip.label}</div>}
                 <div className="route-line">
                   <SiteLabel id={r.trip.from_site_id} />
                   <span className="arrow">←</span>
@@ -135,6 +136,7 @@ export default function Tasks({ onEdit }: { onEdit: (t: EditTarget) => void }) {
                   </span>
                   <span className={`status-pill status-${r.duty.status}`}>{STATUS_HE[r.duty.status]}</span>
                 </div>
+                {r.duty.label && <div className="task-label">{r.duty.label}</div>}
                 <div className="route-line"><span className="code">{r.duty.site_id}</span></div>
                 <div className="task-card-meta">
                   <span>מ־{fmtDateTime(r.duty.start_time)}</span>

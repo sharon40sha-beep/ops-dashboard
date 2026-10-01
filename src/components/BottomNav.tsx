@@ -1,8 +1,9 @@
 import type { Role } from '../types'
 
-export type Tab = 'tasks' | 'create' | 'history' | 'admin'
+export type Tab = 'week' | 'tasks' | 'create' | 'history' | 'admin'
 
 const TABS: { id: Tab; label: string; icon: string; adminOnly?: boolean }[] = [
+  { id: 'week', label: 'השבוע שלי', icon: '📅' },
   { id: 'tasks', label: 'משימות', icon: '☑️' },
   { id: 'create', label: 'יצירה', icon: '➕', adminOnly: true },
   { id: 'history', label: 'היסטוריה', icon: '🗂️' },

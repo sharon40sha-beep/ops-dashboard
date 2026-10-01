@@ -42,6 +42,7 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
       : [{ route_id: '', checkpoint_note: '' }],
   )
   const [entryPointId, setEntryPointId] = useState(editTrip?.planned_entry_point_id ?? '')
+  const [label, setLabel] = useState(editTrip?.label ?? '')
   const [scheduledDate, setScheduledDate] = useState(editTrip?.scheduled_date ?? '')
   const [plannedStart, setPlannedStart] = useState(editTrip?.planned_start_time?.slice(0, 5) ?? '')
   const [plannedEnd, setPlannedEnd] = useState(editTrip?.planned_end_time?.slice(0, 5) ?? '')
@@ -64,6 +65,7 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
   const [dWorkers, setDWorkers] = useState<Set<string>>(() => new Set(editDuty?.worker_ids ?? []))
   const [dStart, setDStart] = useState(editDuty ? toLocalInput(editDuty.start_time) : '')
   const [dEnd, setDEnd] = useState(editDuty ? toLocalInput(editDuty.end_time) : '')
+  const [dLabel, setDLabel] = useState(editDuty?.label ?? '')
 
   const effectiveTo = toSite || (sitesById.has(DEFAULT_TO_SITE) ? DEFAULT_TO_SITE : '')
   const destEntryPoints = useMemo(
@@ -134,11 +136,11 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
       ? await supabase.rpc('update_duty_shift', {
           session_token: token, duty_shift_id: editDuty.id, site_id: dSite,
           worker_ids: [...dWorkers], duty_type_id: dType,
-          start_time: localToIso(dStart), end_time: localToIso(dEnd),
+          start_time: localToIso(dStart), end_time: localToIso(dEnd), p_label: dLabel.trim() || null,
         })
       : await supabase.rpc('create_duty_shift', {
           session_token: token, site_id: dSite, worker_ids: [...dWorkers], duty_type_id: dType,
-          start_time: localToIso(dStart), end_time: localToIso(dEnd),
+          start_time: localToIso(dStart), end_time: localToIso(dEnd), p_label: dLabel.trim() || null,
         })
     setSaving(false)
     if (error) {
@@ -148,7 +150,7 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
     }
     void refresh()
     if (editDuty) { onDone?.(); return }
-    setDSite(''); setDType(''); setDWorkers(new Set()); setDStart(''); setDEnd('')
+    setDSite(''); setDType(''); setDWorkers(new Set()); setDStart(''); setDEnd(''); setDLabel('')
     setToast('נוצרה משמרת')
   }
 
@@ -173,7 +175,7 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
           worker_ids: [...workers], vehicle_ids: [...vehiclesPicked],
           route_segments: cleanSegments, entry_point_id: entryPointId || null,
           scheduled_date: scheduledDate, planned_start_time: plannedStart || null, planned_end_time: plannedEnd || null,
-          p_assets: buildAssets(),
+          p_assets: buildAssets(), p_label: label.trim() || null,
         })
       : await supabase.rpc('create_trip', {
           session_token: token,
@@ -181,7 +183,7 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
           worker_ids: [...workers], vehicle_ids: [...vehiclesPicked],
           route_segments: cleanSegments, entry_point_id: entryPointId || null,
           scheduled_date: scheduledDate, planned_start_time: plannedStart || null, planned_end_time: plannedEnd || null,
-          p_assets: buildAssets(),
+          p_assets: buildAssets(), p_label: label.trim() || null,
           return_of_trip_id: isReturn ? returnOf : null,
         })
     setSaving(false)
@@ -197,6 +199,7 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
     setVehiclesPicked(new Set())
     setSegments([{ route_id: '', checkpoint_note: '' }])
     setEntryPointId('')
+    setLabel('')
     setScheduledDate('')
     setPlannedStart('')
     setPlannedEnd('')
@@ -236,6 +239,8 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
               </button>
             ))}
           </div>
+          <label>תווית (אופציונלי — תצוגה בלבד)</label>
+          <input type="text" value={dLabel} onChange={(e) => setDLabel(e.target.value)} placeholder="לדוגמה: משמרת ערב" />
           <div style={{ display: 'flex', gap: 12 }}>
             <div style={{ flex: 1 }}>
               <label>התחלה</label>
@@ -347,6 +352,9 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
           <option value="">{destEntryPoints.length === 0 ? '— אין שערים מוגדרים ליעד —' : '— ללא —'}</option>
           {destEntryPoints.map((ep) => <option key={ep.id} value={ep.id}>{ep.label}</option>)}
         </select>
+
+        <label>תווית (אופציונלי — תצוגה בלבד)</label>
+        <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="לדוגמה: משימת בוקר" />
 
         <label>תאריך מתוכנן *</label>
         <input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} />
