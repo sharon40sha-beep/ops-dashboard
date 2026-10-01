@@ -66,6 +66,7 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
   const [dStart, setDStart] = useState(editDuty ? toLocalInput(editDuty.start_time) : '')
   const [dEnd, setDEnd] = useState(editDuty ? toLocalInput(editDuty.end_time) : '')
   const [dLabel, setDLabel] = useState(editDuty?.label ?? '')
+  const [dTpl, setDTpl] = useState(editDuty?.checklist_template_id ?? '')
 
   const effectiveTo = toSite || (sitesById.has(DEFAULT_TO_SITE) ? DEFAULT_TO_SITE : '')
   const destEntryPoints = useMemo(
@@ -102,6 +103,13 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
     return [...picked].map((id) => ({ asset_id: id, template_id: effectiveTpl(id) || null }))
   }
 
+  // duty: the chosen template for the shift (admin's pick, else the only linked, else none)
+  const dTypeTpls = useMemo(() => dutyTypes.find((t) => t.id === dType)?.template_ids ?? [], [dutyTypes, dType])
+  function effectiveDutyTpl(): string {
+    if (dTpl && dTypeTpls.includes(dTpl)) return dTpl
+    return dTypeTpls.length >= 1 ? dTypeTpls[0] : ''
+  }
+
   // the chosen entry point must belong to the current destination
   useEffect(() => {
     if (entryPointId && !destEntryPoints.some((e) => e.id === entryPointId)) setEntryPointId('')
@@ -136,11 +144,13 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
       ? await supabase.rpc('update_duty_shift', {
           session_token: token, duty_shift_id: editDuty.id, site_id: dSite,
           worker_ids: [...dWorkers], duty_type_id: dType,
-          start_time: localToIso(dStart), end_time: localToIso(dEnd), p_label: dLabel.trim() || null,
+          start_time: localToIso(dStart), end_time: localToIso(dEnd),
+          p_label: dLabel.trim() || null, p_template_id: effectiveDutyTpl() || null,
         })
       : await supabase.rpc('create_duty_shift', {
           session_token: token, site_id: dSite, worker_ids: [...dWorkers], duty_type_id: dType,
-          start_time: localToIso(dStart), end_time: localToIso(dEnd), p_label: dLabel.trim() || null,
+          start_time: localToIso(dStart), end_time: localToIso(dEnd),
+          p_label: dLabel.trim() || null, p_template_id: effectiveDutyTpl() || null,
         })
     setSaving(false)
     if (error) {
@@ -150,7 +160,7 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
     }
     void refresh()
     if (editDuty) { onDone?.(); return }
-    setDSite(''); setDType(''); setDWorkers(new Set()); setDStart(''); setDEnd(''); setDLabel('')
+    setDSite(''); setDType(''); setDWorkers(new Set()); setDStart(''); setDEnd(''); setDLabel(''); setDTpl('')
     setToast('נוצרה משמרת')
   }
 
@@ -226,10 +236,18 @@ export default function Create({ editTarget, onDone }: { editTarget?: EditTarget
             {sortedSites.map((s) => <option key={s.id} value={s.id}>{siteLabel(s, s.id, siteTypesById)}</option>)}
           </select>
           <label>סוג משמרת</label>
-          <select value={dType} onChange={(e) => setDType(e.target.value)}>
+          <select value={dType} onChange={(e) => { setDType(e.target.value); setDTpl('') }}>
             <option value="">— בחר —</option>
             {dutyTypes.filter((t) => t.is_active).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
           </select>
+          {dType && dTypeTpls.length > 1 && (
+            <>
+              <label>תבנית צ׳קליסט</label>
+              <select value={effectiveDutyTpl()} onChange={(e) => setDTpl(e.target.value)}>
+                {dTypeTpls.map((id) => <option key={id} value={id}>{tplName.get(id) ?? id}</option>)}
+              </select>
+            </>
+          )}
           <label>עובדים (אחד או יותר)</label>
           <div className="asset-pick">
             {employees.map((w) => (
